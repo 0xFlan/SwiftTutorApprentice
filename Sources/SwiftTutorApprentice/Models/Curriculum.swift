@@ -19,7 +19,8 @@ enum Curriculum {
     static let defaultLessons: [Lesson] = [
         lesson1, lesson2, lesson3, lesson4, lesson5, lesson6, lesson7,
         lesson8, lesson9, lesson10, lesson11, lesson12, lesson13,
-        lesson14, lesson15, lesson16, lesson17
+        lesson14, lesson15, lesson16, lesson17,
+        lesson18, lesson19, lesson20, lesson21, lesson22
     ]
 
     /// Convenience: find a default lesson by its id.
@@ -669,6 +670,209 @@ enum Curriculum {
             return number * 2
         }
         print(double(5))
+        """
+    )
+
+    // MARK: - Lesson 18: Fixed Sets of Options (Enums)
+
+    static let lesson18 = Lesson(
+        id: 18,
+        title: "Fixed Sets of Options (Enums)",
+        goal: "Define a type that can only be one of a fixed set of values.",
+        starterCode: "enum Direction {\n    case north\n    case south\n}\nlet heading = Direction.north\nprint(heading)",
+        teaches: ["enum", "case", "fixed options"],
+        glossaryTerms: ["enum", "case", "type", "value"],
+        syntaxTokens: [
+            SyntaxToken(id: 0, display: "enum", explanation: "Defines an enumeration: a type with a fixed set of possible values."),
+            SyntaxToken(id: 1, display: "Direction", explanation: "The name of your new type."),
+            SyntaxToken(id: 2, display: "case north", explanation: "One of the allowed values. An enum lists each option as a case."),
+            SyntaxToken(id: 3, display: "Direction.north", explanation: "Picks the north case of the Direction enum.")
+        ],
+        syntaxWhy: """
+        An enum is for values that can only be one of a known, fixed set — a \
+        compass direction, a status, a suit of cards. Each option is a case.
+
+        Direction.north is guaranteed to be one of the cases you listed, so Swift \
+        can catch typos and missing options at build time.
+        """,
+        expectedOutput: "north",
+        successMarkers: ["enum", "case", "Direction."],
+        successMessage: """
+        You defined an enum with two cases and used one. Swift now knows a \
+        Direction can only ever be north or south.
+        """,
+        hint: """
+        Define an enum with cases, then use one:
+        enum Direction {
+            case north
+            case south
+        }
+        let heading = Direction.north
+        print(heading)
+        """
+    )
+
+    // MARK: - Lesson 19: Requiring Conditions with guard
+
+    static let lesson19 = Lesson(
+        id: 19,
+        title: "Requiring Conditions with guard",
+        goal: "Exit early when a requirement isn't met, keeping the happy path clean.",
+        starterCode: "func greet(_ name: String) {\n    guard !name.isEmpty else {\n        print(\"No name given\")\n        return\n    }\n    print(\"Hello, \\(name)!\")\n}\ngreet(\"Alex\")",
+        teaches: ["guard", "early exit", "! (not)"],
+        glossaryTerms: ["guard", "condition", "Bool", "function"],
+        syntaxTokens: [
+            SyntaxToken(id: 0, display: "guard", explanation: "Requires a condition to be true to keep going. If it's false, the else block runs."),
+            SyntaxToken(id: 1, display: "!name.isEmpty", explanation: "The condition. The ! means \"not\", so this reads \"name is NOT empty\"."),
+            SyntaxToken(id: 2, display: "else { … }", explanation: "Runs only when the condition failed. It must leave (return), so the rest can assume the condition held."),
+            SyntaxToken(id: 3, display: "return", explanation: "Exits the function early, before reaching the code below.")
+        ],
+        syntaxWhy: """
+        guard checks a requirement up front. If the requirement holds, execution \
+        continues past the guard. If not, the else block runs and must exit \
+        (return) — so the code after the guard can safely assume the requirement \
+        is met.
+
+        Here name is "Alex" (not empty), so Swift skips the else and prints the \
+        greeting. guard keeps the main path un-indented and readable.
+        """,
+        expectedOutput: "Hello, Alex!",
+        successMarkers: ["guard", "else", "return"],
+        successMessage: """
+        You used guard to require a condition. Because name wasn't empty, Swift \
+        skipped the else block and ran the greeting.
+        """,
+        hint: """
+        Use guard to require a condition, with an else that exits:
+        guard !name.isEmpty else {
+            print("No name given")
+            return
+        }
+        print("Hello, \\(name)!")
+        """
+    )
+
+    // MARK: - Lesson 20: Blocks of Code as Values (Closures)
+
+    static let lesson20 = Lesson(
+        id: 20,
+        title: "Blocks of Code as Values (Closures)",
+        goal: "Store a block of code in a value and run it later.",
+        starterCode: "let sayHi = {\n    print(\"Hi!\")\n}\nsayHi()",
+        teaches: ["closure", "code as a value", "calling a closure"],
+        glossaryTerms: ["closure", "function", "braces", "value"],
+        syntaxTokens: [
+            SyntaxToken(id: 0, display: "let sayHi", explanation: "A constant that will hold a block of code."),
+            SyntaxToken(id: 1, display: "=", explanation: "Assignment — stores the block on the right into sayHi."),
+            SyntaxToken(id: 2, display: "{ … }", explanation: "A closure: a block of code wrapped in braces, treated as a value."),
+            SyntaxToken(id: 3, display: "sayHi()", explanation: "Runs the stored closure, just like calling a function.")
+        ],
+        syntaxWhy: """
+        A closure is a block of code you can store in a value and pass around. \
+        Here the braces { } hold code, and sayHi holds that whole block.
+
+        Nothing runs when you store it. sayHi() is what actually runs the code — \
+        the parentheses call it, exactly like a function. Closures are everywhere \
+        in Swift: button actions, list transforms, and completion handlers are all \
+        closures.
+        """,
+        expectedOutput: "Hi!",
+        successMarkers: ["let sayHi", "{", "sayHi()"],
+        successMessage: """
+        You stored a block of code in a closure, then ran it with sayHi(). \
+        Defining the closure didn't run it — calling it did.
+        """,
+        hint: """
+        Store a block of code in a value, then call it:
+        let sayHi = {
+            print("Hi!")
+        }
+        sayHi()
+        """
+    )
+
+    // MARK: - Lesson 21: Handling Errors (do / try / catch)
+
+    static let lesson21 = Lesson(
+        id: 21,
+        title: "Handling Errors (do / try / catch)",
+        goal: "Let a function signal failure, and handle it safely where you call it.",
+        starterCode: "enum FormError: Error {\n    case empty\n}\nfunc check(_ text: String) throws {\n    if text.isEmpty {\n        throw FormError.empty\n    }\n    print(\"OK: \\(text)\")\n}\ndo {\n    try check(\"Alex\")\n} catch {\n    print(\"Something went wrong\")\n}",
+        teaches: ["error handling", "throws", "try", "do / catch"],
+        glossaryTerms: ["error handling", "enum", "function", "condition"],
+        syntaxTokens: [
+            SyntaxToken(id: 0, display: "throws", explanation: "Marks a function that can throw an error instead of finishing normally."),
+            SyntaxToken(id: 1, display: "throw FormError.empty", explanation: "Signals failure and stops the function, handing the error to the caller."),
+            SyntaxToken(id: 2, display: "do {", explanation: "Starts a block where errors can be caught."),
+            SyntaxToken(id: 3, display: "try", explanation: "Marks a call that might throw. Required in front of any throwing call."),
+            SyntaxToken(id: 4, display: "catch {", explanation: "Runs if the do block threw an error, so your program can recover.")
+        ],
+        syntaxWhy: """
+        Some operations can fail. A function marked throws can throw an error to \
+        say "I couldn't do this". You call such a function inside a do block with \
+        try in front, and a catch block handles any error.
+
+        Here the text isn't empty, so check doesn't throw — it prints OK and the \
+        catch block never runs. If the text had been empty, throw would jump \
+        straight to catch. This is how Swift keeps failures explicit and safe.
+        """,
+        expectedOutput: "OK: Alex",
+        successMarkers: ["throws", "try", "catch"],
+        successMessage: """
+        You wrote a throwing function and called it safely with do / try / catch. \
+        The input was valid, so it printed OK and skipped the catch.
+        """,
+        hint: """
+        Mark the function throws, then call it inside do/try/catch:
+        func check(_ text: String) throws { … throw FormError.empty … }
+        do {
+            try check("Alex")
+        } catch {
+            print("Something went wrong")
+        }
+        """
+    )
+
+    // MARK: - Lesson 22: Objects You Can Share (Classes)
+
+    static let lesson22 = Lesson(
+        id: 22,
+        title: "Objects You Can Share (Classes)",
+        goal: "Create a class with changeable state and call its methods.",
+        starterCode: "class Counter {\n    var count = 0\n    func increment() {\n        count += 1\n    }\n}\nlet c = Counter()\nc.increment()\nc.increment()\nprint(c.count)",
+        teaches: ["class", "method", "shared/reference type"],
+        glossaryTerms: ["class", "struct", "property", "function"],
+        syntaxTokens: [
+            SyntaxToken(id: 0, display: "class", explanation: "Defines a class — like a struct, but a reference type (shared, not copied)."),
+            SyntaxToken(id: 1, display: "Counter", explanation: "The name of your new type."),
+            SyntaxToken(id: 2, display: "var count = 0", explanation: "A property that stores changeable state for each Counter."),
+            SyntaxToken(id: 3, display: "func increment()", explanation: "A method: a function that belongs to the class and can change its properties."),
+            SyntaxToken(id: 4, display: "c.increment()", explanation: "Calls the method on the instance c, changing its count.")
+        ],
+        syntaxWhy: """
+        A class defines a type, like a struct — but classes are REFERENCE types: \
+        if you share one, everyone sees the same object. Structs are value types \
+        (copied when assigned).
+
+        count is a property; increment() is a method (a function inside the type). \
+        c.increment() runs twice, so c.count is 2. Use a struct by default in \
+        Swift; reach for a class when you specifically need shared, mutable state.
+        """,
+        expectedOutput: "2",
+        successMarkers: ["class", "increment()", "c.count"],
+        successMessage: """
+        You defined a class with a property and a method, made an instance, and \
+        changed its state by calling increment() twice.
+        """,
+        hint: """
+        Define a class with a property and a method, then use it:
+        class Counter {
+            var count = 0
+            func increment() { count += 1 }
+        }
+        let c = Counter()
+        c.increment()
+        print(c.count)
         """
     )
 }

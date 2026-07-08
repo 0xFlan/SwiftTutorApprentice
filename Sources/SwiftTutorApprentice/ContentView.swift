@@ -32,7 +32,7 @@ struct ContentView: View {
         } detail: {
             LessonWorkspace(model: model, settings: model.settings, progress: model.progress)
                 .navigationTitle("SwiftTutor Apprentice")
-                .navigationSubtitle("Lesson \(model.currentLesson.id): \(model.currentLesson.title)")
+                .navigationSubtitle("Lesson \(model.currentDisplayNumber): \(model.currentLesson.title)")
         }
         .frame(minWidth: 1120, minHeight: 740)
         // First-run welcome / onboarding.

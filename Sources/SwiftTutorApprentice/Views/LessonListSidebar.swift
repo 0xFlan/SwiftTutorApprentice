@@ -26,8 +26,8 @@ struct LessonListSidebar: View {
                 set: { newValue in if let id = newValue { model.selectLesson(id) } }
             )) {
                 Section("Lessons") {
-                    ForEach(store.lessons) { lesson in
-                        lessonRow(lesson)
+                    ForEach(Array(store.lessons.enumerated()), id: \.element.id) { index, lesson in
+                        lessonRow(lesson, number: index + 1)
                             .tag(lesson.id)
                     }
                 }
@@ -74,14 +74,14 @@ struct LessonListSidebar: View {
         .frame(minWidth: 230)
     }
 
-    private func lessonRow(_ lesson: Lesson) -> some View {
+    private func lessonRow(_ lesson: Lesson, number: Int) -> some View {
         HStack(spacing: 8) {
             // Completed = filled green check; not yet = hollow circle.
             Image(systemName: progress.isComplete(lesson.id) ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(progress.isComplete(lesson.id) ? .green : .secondary)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("Lesson \(lesson.id)")
+                Text("Lesson \(number)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Text(lesson.title)

@@ -498,6 +498,104 @@ enum Glossary {
             the place it was called. Returning values lets functions compute \
             results you can use elsewhere.
             """
+        ),
+
+        // MARK: Advanced fundamentals
+
+        GlossaryEntry(
+            term: "enum",
+            short: "A type with a fixed set of named values (cases).",
+            deep: """
+            An enum (enumeration) defines a type that can only be one of a fixed \
+            set of values, each written as a case:
+
+            enum Direction { case north, south, east, west }
+
+            Enums make impossible states impossible — a Direction can never be a \
+            typo, because Swift only allows the cases you defined.
+            """
+        ),
+        GlossaryEntry(
+            term: "case",
+            short: "One of the allowed values of an enum.",
+            deep: """
+            A case is a single named option inside an enum. In \
+            enum Direction { case north; case south }, north and south are cases.
+
+            You refer to one with the type name and a dot: Direction.north. `case` \
+            also appears in switch statements, matching one possibility at a time.
+            """
+        ),
+        GlossaryEntry(
+            term: "guard",
+            short: "Requires a condition to be true, or exits early.",
+            deep: """
+            guard states a requirement. If the condition is true, execution \
+            continues past the guard. If it's false, the else block runs and must \
+            leave (return, throw, break…).
+
+            guard !name.isEmpty else { return }
+
+            After the guard, the rest of the code can safely assume the requirement \
+            held — keeping the main path un-indented and readable.
+            """
+        ),
+        GlossaryEntry(
+            term: "closure",
+            short: "A block of code stored as a value.",
+            deep: """
+            A closure is a block of code wrapped in braces that you can store in a \
+            value, pass to a function, and run later:
+
+            let sayHi = { print("Hi!") }
+            sayHi()   // runs it
+
+            Closures power button actions, list transforms (map/filter), and \
+            completion handlers. A function is essentially a named closure.
+            """
+        ),
+        GlossaryEntry(
+            term: "class",
+            short: "A type whose instances are shared (a reference type).",
+            deep: """
+            A class defines a type much like a struct, but classes are REFERENCE \
+            types: when you assign or pass one, everyone shares the same instance \
+            rather than getting a copy.
+
+            Swift style is to use a struct by default and reach for a class only \
+            when you need shared, mutable state. In SwiftUI you'll use structs \
+            constantly and classes for shared models.
+            """
+        ),
+        GlossaryEntry(
+            term: "method",
+            short: "A function that belongs to a type.",
+            deep: """
+            A method is a function defined inside a type (struct, class, or enum). \
+            It can read and change that type's properties.
+
+            class Counter { var count = 0; func increment() { count += 1 } }
+
+            You call a method on an instance with dot syntax: c.increment(). \
+            print(...) is a free function; c.increment() is a method.
+            """
+        ),
+        GlossaryEntry(
+            term: "error handling",
+            short: "Signalling and recovering from failures (throws / try / catch).",
+            deep: """
+            Swift makes failures explicit. A function marked throws can throw an \
+            error; you call it with try inside a do block, and a catch block \
+            handles any error:
+
+            do {
+                try check(text)
+            } catch {
+                print("Something went wrong")
+            }
+
+            This keeps error paths visible instead of failing silently.
+            """
         )
     ]
 }

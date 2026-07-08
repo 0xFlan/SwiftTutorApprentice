@@ -75,6 +75,15 @@ final class AppModel: ObservableObject {
     /// Whether the current lesson has been completed.
     var currentLessonIsComplete: Bool { progress.isComplete(selectedLessonID) }
 
+    /// The 1-based position of a lesson in the list (for display labels).
+    /// Uses position, not id, so reordering shows sensible numbers.
+    func displayNumber(for lesson: Lesson) -> Int {
+        (store.lessons.firstIndex { $0.id == lesson.id } ?? 0) + 1
+    }
+
+    /// The current lesson's 1-based position.
+    var currentDisplayNumber: Int { displayNumber(for: currentLesson) }
+
     /// Live coaching feedback for the current code + lesson.
     var coachFeedback: String {
         coach.feedback(for: code, lesson: currentLesson)

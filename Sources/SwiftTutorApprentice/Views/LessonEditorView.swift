@@ -70,9 +70,9 @@ struct LessonEditorView: View {
                 get: { draft.id },
                 set: { if let id = $0 { switchTo(id) } }
             )) {
-                ForEach(store.lessons) { lesson in
+                ForEach(Array(store.lessons.enumerated()), id: \.element.id) { index, lesson in
                     HStack {
-                        Text("\(lesson.id).")
+                        Text("\(index + 1).")
                             .foregroundStyle(.secondary)
                             .font(.caption.monospaced())
                         Text(lesson.title.isEmpty ? "(untitled)" : lesson.title)

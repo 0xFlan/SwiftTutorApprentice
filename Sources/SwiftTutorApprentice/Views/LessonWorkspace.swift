@@ -23,7 +23,7 @@ struct LessonWorkspace: View {
 
             // Three resizable columns.
             HSplitView {
-                LessonPanel(lesson: model.currentLesson)
+                LessonPanel(lesson: model.currentLesson, number: model.currentDisplayNumber)
                     .frame(minWidth: 320, idealWidth: 380)
 
                 CodeEditorPanel(

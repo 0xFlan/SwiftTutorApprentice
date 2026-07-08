@@ -13,6 +13,8 @@ import SwiftUI
 
 struct LessonPanel: View {
     let lesson: Lesson
+    /// 1-based position in the curriculum (for the "Lesson N" label).
+    let number: Int
 
     var body: some View {
         ScrollView {
@@ -20,7 +22,7 @@ struct LessonPanel: View {
 
                 // --- Header ---
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Lesson \(lesson.id)")
+                    Text("Lesson \(number)")
                         .font(.caption.bold())
                         .foregroundStyle(.secondary)
                     Text(lesson.title)
