@@ -4,3 +4,5 @@
 Workspace/
 # macOS
 .DS_Store
+# Generated .app bundle
+dist/
