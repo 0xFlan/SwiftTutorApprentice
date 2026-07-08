@@ -29,7 +29,7 @@ struct CodeEditorPanel: View {
                 } label: {
                     Label("Insert starter", systemImage: "text.insert")
                 }
-                .help("Fill the editor with print(\"Hello, Swift!\")")
+                .help("Fill the editor with this lesson's starter code")
             }
 
             Text("Type Swift here. This is the file that gets run.")

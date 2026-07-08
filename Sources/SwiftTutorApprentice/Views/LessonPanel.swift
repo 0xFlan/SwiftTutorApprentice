@@ -1,7 +1,12 @@
 // LessonPanel.swift
 // ------------------------------------------------------------
-// The left column. Shows the current lesson, the vocabulary terms
-// (as clickable glossary chips), and the Syntax Lens.
+// The left column of the work area. Shows the current lesson's
+// title, goal, the code to type, what it teaches, the vocabulary
+// terms for THIS lesson (as clickable glossary chips), and the
+// Syntax Lens for the lesson's key line.
+//
+// Everything here comes from the Lesson data — this view doesn't
+// know anything about a specific lesson.
 // ------------------------------------------------------------
 
 import SwiftUI
@@ -13,7 +18,7 @@ struct LessonPanel: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
 
-                // --- Lesson header ---
+                // --- Header ---
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Lesson \(lesson.id)")
                         .font(.caption.bold())
@@ -30,7 +35,7 @@ struct LessonPanel: View {
 
                 // --- What you will type ---
                 section("What you will type") {
-                    Text(lesson.codeToType)
+                    Text(lesson.starterCode)
                         .font(.system(.body, design: .monospaced))
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -42,21 +47,25 @@ struct LessonPanel: View {
                 section("What this teaches") {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(lesson.teaches, id: \.self) { item in
-                            Label(item, systemImage: "circle.fill")
-                                .labelStyle(BulletLabelStyle())
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Image(systemName: "circle.fill")
+                                    .font(.system(size: 5))
+                                    .foregroundStyle(.secondary)
+                                Text(item)
+                            }
                         }
                     }
                 }
 
                 Divider()
 
-                // --- Terms (glossary chips) ---
+                // --- Terms (glossary chips for this lesson) ---
                 section("Terms") {
                     Text("Hover for a quick definition, click for more.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     FlowLayout(spacing: 6) {
-                        ForEach(Glossary.displayOrder, id: \.self) { term in
+                        ForEach(lesson.glossaryTerms, id: \.self) { term in
                             GlossaryTermView(term: term)
                         }
                     }
@@ -65,10 +74,10 @@ struct LessonPanel: View {
 
                 Divider()
 
-                // --- Syntax Lens ---
+                // --- Syntax Lens for this lesson's key line ---
                 SyntaxLensView(
-                    tokens: SyntaxLens.helloWorldTokens,
-                    whyExplanation: SyntaxLens.whyExplanation
+                    tokens: lesson.syntaxTokens,
+                    whyExplanation: lesson.syntaxWhy
                 )
 
                 Spacer(minLength: 0)
@@ -87,18 +96,6 @@ struct LessonPanel: View {
             Text(title)
                 .font(.headline)
             content()
-        }
-    }
-}
-
-/// Renders a Label as a small bullet + text.
-private struct BulletLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "circle.fill")
-                .font(.system(size: 5))
-                .foregroundStyle(.secondary)
-            configuration.title
         }
     }
 }

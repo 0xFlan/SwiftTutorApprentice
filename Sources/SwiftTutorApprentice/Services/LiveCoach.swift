@@ -1,99 +1,93 @@
 // LiveCoach.swift
 // ------------------------------------------------------------
-// The Live Coach reads whatever is currently in the code editor
-// and returns friendly, beginner-level feedback about it.
+// The Live Coach reads whatever is in the code editor and returns
+// friendly, beginner-level feedback. It updates as the learner types.
 //
-// For the MVP this is RULE-BASED: it looks for a few specific
-// patterns and responds. There is no AI here yet.
+// It is RULE-BASED (no AI yet) and works in two layers:
+//   1. Generic structural checks that apply to ANY lesson
+//      (empty editor, unbalanced quotes / parentheses / braces).
+//   2. Lesson-specific checks driven by data on the Lesson itself
+//      (its successMarkers, successMessage, and hint).
+//
+// This keeps the coach reusable across the whole curriculum: adding
+// a new lesson doesn't require touching this file.
 //
 // TODO: Replace rule-based LiveCoach with AI-assisted explanations.
-// TODO: Add Claude/Codex project review buttons that feed code here.
+// TODO: Add a "review my whole file" button that sends code to Claude/Codex.
 // ------------------------------------------------------------
 
 import Foundation
 
-/// Analyzes editor text and produces beginner feedback.
 struct LiveCoach {
 
-    /// The exact code this lesson is guiding the learner toward.
-    private let target = "print(\"Hello, Swift!\")"
-
-    /// Return feedback for the current editor contents.
-    func feedback(for code: String) -> String {
+    /// Feedback for the current editor contents, in the context of a lesson.
+    func feedback(for code: String, lesson: Lesson) -> String {
         let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Case D: nothing typed yet.
+        // --- Layer 1: generic checks ---
+
+        // Empty editor.
         if trimmed.isEmpty {
-            return """
-            Start by typing:
-            print("Hello, Swift!")
-            """
+            return "Start by typing:\n\(lesson.starterCode)"
         }
 
-        // Case A: the target line is present and looks complete.
-        if trimmed.contains(target) {
-            return """
-            Good. This calls the print function and gives it one String: "Hello, Swift!".
-
-            • print sends text to the console.
-            • The parentheses hold the input for the function.
-            • The quotation marks tell Swift this is text.
-
-            When you run this, the expected output is:
-            Hello, Swift!
-            """
+        // Unbalanced quotes / parentheses / braces.
+        let structuralProblems = structuralProblems(in: trimmed)
+        if !structuralProblems.isEmpty {
+            var lines = ["This isn't finished yet:"]
+            lines.append(contentsOf: structuralProblems.map { "• \($0)" })
+            lines.append("")
+            lines.append("Aim for:\n\(lesson.starterCode)")
+            return lines.joined(separator: "\n")
         }
 
-        // Case B: a print(...) call that is not finished (unbalanced quotes/parens).
-        if trimmed.contains("print(") {
-            let quoteCount = trimmed.filter { $0 == "\"" }.count
-            let openParens = trimmed.filter { $0 == "(" }.count
-            let closeParens = trimmed.filter { $0 == ")" }.count
+        // --- Layer 2: lesson-specific checks ---
 
-            let missingQuote = (quoteCount % 2 != 0)
-            let missingParen = (openParens > closeParens)
-
-            if missingQuote || missingParen {
-                var lines: [String] = [
-                    "You started a print(...) but it isn't finished yet:"
-                ]
-                if missingQuote {
-                    lines.append(
-                        "• You have an opening quotation mark \" but no matching closing one. "
-                        + "Quotation marks come in pairs — one to start the text and one to end it."
-                    )
-                }
-                if missingParen {
-                    lines.append(
-                        "• You opened a parenthesis ( but haven't closed it with ) yet. "
-                        + "Every ( needs a matching )."
-                    )
-                }
-                lines.append("")
-                lines.append("Aim for: print(\"Hello, Swift!\")")
-                return lines.joined(separator: "\n")
+        // Looks right: all of the lesson's success markers are present.
+        let hasAllMarkers = lesson.successMarkers.allSatisfy { trimmed.contains($0) }
+        if hasAllMarkers {
+            var message = lesson.successMessage
+            if !lesson.expectedOutput.isEmpty {
+                message += "\n\nWhen you run this, the expected output is:\n\(lesson.expectedOutput)"
             }
+            return message
         }
 
-        // Case C: there is quoted text somewhere.
-        if trimmed.contains("\"") {
-            return """
-            Anything you put inside quotation marks " " is treated as a String — \
-            literal text. Swift won't try to run it or look it up as a name; it \
-            just keeps the characters exactly as typed.
+        // Not there yet: show the lesson's hint.
+        return lesson.hint
+    }
 
-            For this lesson, try passing the String into print:
-            print("Hello, Swift!")
-            """
+    // MARK: - Generic structural analysis
+
+    /// Returns a beginner-friendly message for each structural problem found.
+    /// An empty result means quotes, parentheses, and braces are all balanced.
+    private func structuralProblems(in code: String) -> [String] {
+        var problems: [String] = []
+
+        let quoteCount = code.filter { $0 == "\"" }.count
+        if quoteCount % 2 != 0 {
+            problems.append(
+                "You have an opening quotation mark \" without a matching closing one. "
+                + "Quotation marks come in pairs — one to start the text, one to end it."
+            )
         }
 
-        // Fallback: something else was typed.
-        return """
-        Keep going. For this lesson the goal is to call the print function with \
-        a String, like this:
-        print("Hello, Swift!")
+        let openParens = code.filter { $0 == "(" }.count
+        let closeParens = code.filter { $0 == ")" }.count
+        if openParens > closeParens {
+            problems.append("You opened a parenthesis ( but haven't closed it with ) yet.")
+        } else if closeParens > openParens {
+            problems.append("You have a closing parenthesis ) with no matching opening ( before it.")
+        }
 
-        print writes text to the console.
-        """
+        let openBraces = code.filter { $0 == "{" }.count
+        let closeBraces = code.filter { $0 == "}" }.count
+        if openBraces > closeBraces {
+            problems.append("You opened a brace { but haven't closed it with } yet. Every { needs a matching }.")
+        } else if closeBraces > openBraces {
+            problems.append("You have a closing brace } with no matching opening { before it.")
+        }
+
+        return problems
     }
 }
