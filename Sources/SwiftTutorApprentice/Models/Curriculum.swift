@@ -1,28 +1,30 @@
 // Curriculum.swift
 // ------------------------------------------------------------
-// The actual course content. Every lesson is plain data, so the
-// whole app is driven by this one file: add a Lesson here and it
-// shows up in the sidebar with its own terms, syntax breakdown,
-// coaching, and expected output.
+// The DEFAULT course content, defined in code. On first launch,
+// the LessonStore copies these into an editable JSON file; from
+// then on the app reads/writes that JSON, and you can add or edit
+// lessons entirely inside the app. "Restore default lessons" in
+// the lesson editor brings this set back.
 //
-// The lessons build on each other: print -> constants -> variables
-// -> string interpolation -> math -> decisions -> your own function.
+// The lessons build on each other, from print all the way to
+// your own functions and structs.
 // ------------------------------------------------------------
 
 import Foundation
 
 enum Curriculum {
 
-    /// Every lesson, in order. The sidebar shows them like this.
-    static let lessons: [Lesson] = [
+    /// The built-in starting curriculum, in order. The LessonStore seeds
+    /// from this and can restore it on demand.
+    static let defaultLessons: [Lesson] = [
         lesson1, lesson2, lesson3, lesson4, lesson5, lesson6, lesson7,
         lesson8, lesson9, lesson10, lesson11, lesson12, lesson13,
         lesson14, lesson15, lesson16, lesson17
     ]
 
-    /// Convenience: find a lesson by its id.
-    static func lesson(id: Int) -> Lesson? {
-        lessons.first { $0.id == id }
+    /// Convenience: find a default lesson by its id.
+    static func defaultLesson(id: Int) -> Lesson? {
+        defaultLessons.first { $0.id == id }
     }
 
     // MARK: - Lesson 1: Printing Text

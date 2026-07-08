@@ -14,11 +14,13 @@
 import Foundation
 
 /// One clickable piece of a line of code, plus a beginner explanation.
-struct SyntaxToken: Identifiable, Hashable {
+///
+/// Fields are `var` so the in-app lesson editor can change them.
+struct SyntaxToken: Identifiable, Hashable, Codable {
     // A stable id, unique within one lesson's token list.
-    let id: Int
+    var id: Int
     /// What is shown on the token chip, e.g. `print` or `(`.
-    let display: String
+    var display: String
     /// The beginner explanation shown when the token is tapped.
-    let explanation: String
+    var explanation: String
 }

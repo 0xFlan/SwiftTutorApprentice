@@ -20,8 +20,8 @@ import SwiftUI
 @MainActor
 final class AppModel: ObservableObject {
 
-    /// The full curriculum (all lessons, in order).
-    let lessons = Curriculum.lessons
+    /// The editable curriculum (loaded from JSON, seeded from defaults).
+    let store = LessonStore()
 
     /// Persistent record of which lessons are complete.
     let progress = ProgressStore()
@@ -40,14 +40,20 @@ final class AppModel: ObservableObject {
 
     init() {
         // Start on the first lesson.
-        selectedLessonID = Curriculum.lessons.first?.id ?? 1
+        selectedLessonID = store.lessons.first?.id ?? 1
     }
 
     // MARK: - Derived values
 
-    /// The lesson currently being shown.
+    /// All lessons, in order.
+    var lessons: [Lesson] { store.lessons }
+
+    /// The lesson currently being shown (falls back safely if the
+    /// selected lesson was deleted or renumbered).
     var currentLesson: Lesson {
-        Curriculum.lesson(id: selectedLessonID) ?? lessons[0]
+        store.lesson(id: selectedLessonID)
+            ?? store.lessons.first
+            ?? Curriculum.defaultLessons[0]
     }
 
     /// Live coaching feedback for the current code + lesson.
@@ -64,6 +70,17 @@ final class AppModel: ObservableObject {
         code = ""
         prediction = ""
         runResult = nil
+    }
+
+    /// After the lesson list changes (edits/deletes/reorder), make sure the
+    /// selected lesson still exists; if not, fall back to the first lesson.
+    func ensureSelectionValid() {
+        if store.lesson(id: selectedLessonID) == nil {
+            selectedLessonID = store.lessons.first?.id ?? selectedLessonID
+            code = ""
+            prediction = ""
+            runResult = nil
+        }
     }
 
     /// Fill the editor with the current lesson's starter code.

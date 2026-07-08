@@ -9,7 +9,11 @@ import SwiftUI
 
 struct LessonListSidebar: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var store: LessonStore
     @ObservedObject var progress: ProgressStore
+
+    /// Called when the learner taps the "Manage lessons" button.
+    let onManageLessons: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -20,7 +24,7 @@ struct LessonListSidebar: View {
                 set: { newValue in if let id = newValue { model.selectLesson(id) } }
             )) {
                 Section("Lessons") {
-                    ForEach(model.lessons) { lesson in
+                    ForEach(store.lessons) { lesson in
                         lessonRow(lesson)
                             .tag(lesson.id)
                     }
@@ -30,24 +34,34 @@ struct LessonListSidebar: View {
 
             Divider()
 
-            // Footer: progress summary + reset.
-            HStack {
-                Text("\(progress.completedCount) of \(model.lessons.count) complete")
+            // Footer: progress summary, manage lessons, reset progress.
+            VStack(spacing: 8) {
+                HStack {
+                    Text("\(progress.completedCount) of \(store.lessons.count) complete")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Reset") {
+                        progress.reset()
+                    }
+                    .buttonStyle(.borderless)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button("Reset") {
-                    progress.reset()
+                    .help("Forget all completed lessons")
+                    .disabled(progress.completedCount == 0)
                 }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .help("Forget all completed lessons")
-                .disabled(progress.completedCount == 0)
+
+                Button {
+                    onManageLessons()
+                } label: {
+                    Label("Manage lessons", systemImage: "square.and.pencil")
+                        .frame(maxWidth: .infinity)
+                }
+                .help("Add, edit, reorder, or delete lessons — all inside the app")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
-        .frame(minWidth: 220)
+        .frame(minWidth: 230)
     }
 
     private func lessonRow(_ lesson: Lesson) -> some View {
