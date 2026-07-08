@@ -33,38 +33,48 @@ To run from the terminal instead: `swift run SwiftTutorApprentice`.
 
 ## What it does
 
-**A complete beginner Swift curriculum (17 lessons)** that builds up step by
+**A complete beginner Swift curriculum (24 lessons)** that builds up step by
 step:
 
 1. Printing Text · 2. Constants (`let`) · 3. Variables (`var`) ·
 4. String Interpolation · 5. Math · 6. `if` · 7. Functions ·
 8. `if`/`else` · 9. `Double` · 10. Bool logic · 11. Arrays · 12. Loops ·
 13. Optionals · 14. Dictionaries · 15. Structs · 16. Function parameters ·
-17. Return values
+17. Return values · 18. Enums · 19. `guard` · 20. Closures ·
+21. Error handling · 22. Classes · 23. Your First SwiftUI View ·
+24. Making It Interactive (`@State`)
 
-**The learning loop, every lesson:**
+Lessons 23–24 are **read-only concept lessons** (SwiftUI builds a UI, which
+the console runner can't display) — you read and "mark as read" instead of
+running.
+
+**The learning loop, every code lesson:**
 
 1. Read the lesson (left): goal, what to type, clickable glossary terms, and a
    Syntax Lens that breaks the key line into tappable pieces.
-2. Type the code by hand (middle) — a faint placeholder shows the starter.
+2. Type the code by hand (middle) — with **syntax highlighting** and a faint
+   starter-code placeholder.
 3. Watch the Live Coach react as you type (right): it flags missing
    quotes/parentheses/braces and confirms when the code looks right.
 4. Predict the output (bottom bar).
 5. Run it (**⌘R**). See real `stdout`, `stderr`, and exit code, a
    plain-language explanation, and whether your prediction matched.
 6. A clean run that matches the lesson's expected output marks it complete
-   (green check in the sidebar). Move between lessons with **⌘[** / **⌘]**.
+   (green check). Move between lessons with **⌘[** / **⌘]**.
 
 **Author your own lessons — no files, no terminal.** Click **Manage lessons**
-in the sidebar to add, edit, reorder, and delete lessons (title, code, terms,
-syntax tokens, coach text, expected output). Everything saves automatically.
-**Restore default lessons** brings back the built-in curriculum.
+in the sidebar to add, edit, reorder, and delete lessons. Leave the Syntax Lens
+tokens empty and they're generated automatically, or click **Auto-generate**.
+Everything saves automatically; **Restore default lessons** brings back the
+built-in curriculum.
 
 **Optional AI coach (off by default).** In **Settings** you can enable an
-"Ask the AI coach" button that sends the current lesson and your code to your
-local `claude` CLI (or any command you specify) for extra explanation. The
-rule-based coach always works offline; AI is purely additive and only runs
-when you turn it on and press the button.
+"Ask the AI coach" button, using either:
+- your local **`claude` CLI** (no key needed — reuses your CLI auth), or
+- an **Anthropic API key** (calls the Messages API directly; key stored locally).
+
+The rule-based coach always works offline; AI is additive and only runs when
+you turn it on and press the button.
 
 ## Where things are stored
 
@@ -94,7 +104,7 @@ doesn't need it.
 
 ## Still deferred (future ideas)
 
-API-key AI provider as an alternative to the CLI; a "review my whole project"
-action; automatic Syntax Lens tokenizing for arbitrary lines; SwiftUI-app
-lessons. See the `TODO:` comments in the source.
+Full multi-line Syntax Lens tokenizing (currently the key line); richer
+in-editor diagnostics from the Swift compiler; more concept lessons; a
+"review my whole project" AI action. See the `TODO:` comments in the source.
 ```

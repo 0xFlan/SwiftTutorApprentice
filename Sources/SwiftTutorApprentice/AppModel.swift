@@ -150,10 +150,18 @@ final class AppModel: ObservableObject {
         aiError = nil
         let codeToSend = code
         let lesson = currentLesson
+        let provider = settings.aiProvider
         let command = settings.aiCommand
+        let apiKey = settings.apiKey
+        let apiModel = settings.apiModel
 
         Task {
-            let result = await aiCoach.explain(code: codeToSend, lesson: lesson, command: command)
+            let result: AIResult
+            if provider == "api" {
+                result = await aiCoach.explainViaAPI(code: codeToSend, lesson: lesson, apiKey: apiKey, model: apiModel)
+            } else {
+                result = await aiCoach.explain(code: codeToSend, lesson: lesson, command: command)
+            }
             self.isAskingAI = false
             if let error = result.errorMessage {
                 self.aiError = error

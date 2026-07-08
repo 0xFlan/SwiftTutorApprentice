@@ -21,6 +21,26 @@ final class AppSettings: ObservableObject {
         static let aiEnabled = "aiEnabled"
         static let aiCommand = "aiCommand"
         static let hasSeenWelcome = "hasSeenWelcome"
+        static let aiProvider = "aiProvider"
+        static let apiKey = "apiKey"
+        static let apiModel = "apiModel"
+    }
+
+    /// How the optional AI coach reaches an AI: "cli" (default) or "api".
+    @Published var aiProvider: String {
+        didSet { UserDefaults.standard.set(aiProvider, forKey: Keys.aiProvider) }
+    }
+
+    /// Anthropic API key, used when aiProvider == "api".
+    /// Stored in UserDefaults for simplicity on this personal app. For a
+    /// shipped app you'd keep this in the Keychain instead.
+    @Published var apiKey: String {
+        didSet { UserDefaults.standard.set(apiKey, forKey: Keys.apiKey) }
+    }
+
+    /// Model id for the API provider.
+    @Published var apiModel: String {
+        didSet { UserDefaults.standard.set(apiModel, forKey: Keys.apiModel) }
     }
 
     /// Whether the optional AI coach is available. Off by default.
@@ -44,5 +64,8 @@ final class AppSettings: ObservableObject {
         aiEnabled = defaults.bool(forKey: Keys.aiEnabled) // false if unset
         aiCommand = defaults.string(forKey: Keys.aiCommand) ?? "claude"
         hasSeenWelcome = defaults.bool(forKey: Keys.hasSeenWelcome) // false if unset
+        aiProvider = defaults.string(forKey: Keys.aiProvider) ?? "cli"
+        apiKey = defaults.string(forKey: Keys.apiKey) ?? ""
+        apiModel = defaults.string(forKey: Keys.apiModel) ?? "claude-opus-4-8"
     }
 }

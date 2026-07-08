@@ -40,6 +40,45 @@ final class AICoach: Sendable {
         }
     }
 
+    /// Ask the AI coach via the Anthropic Messages API (an alternative to the
+    /// CLI). Model defaults to Claude Opus 4.8. Requires an API key.
+    func explainViaAPI(code: String, lesson: Lesson, apiKey: String, model: String) async -> AIResult {
+        let key = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else {
+            return AIResult(text: "", errorMessage: "Add your Anthropic API key in Settings to use the API provider.")
+        }
+
+        var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.setValue(key, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+
+        let body: [String: Any] = [
+            "model": model.isEmpty ? "claude-opus-4-8" : model,
+            "max_tokens": 400,
+            "messages": [["role": "user", "content": buildPrompt(code: code, lesson: lesson)]]
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                return AIResult(text: "", errorMessage: "No response from the API.")
+            }
+            guard http.statusCode == 200 else {
+                let detail = Self.extractAPIError(data) ?? "HTTP \(http.statusCode)"
+                return AIResult(text: "", errorMessage: "The API returned an error: \(detail)")
+            }
+            if let text = Self.extractText(data), !text.isEmpty {
+                return AIResult(text: text, errorMessage: nil)
+            }
+            return AIResult(text: "", errorMessage: "Couldn't read a reply from the API response.")
+        } catch {
+            return AIResult(text: "", errorMessage: "Network error: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Private
 
     private func run(code: String, lesson: Lesson, command: String) -> AIResult {
@@ -119,6 +158,25 @@ final class AICoach: Sendable {
         why they matter, and give one small hint for the next step. Do not use \
         tools or read files; just answer directly.
         """
+    }
+
+    /// Pull the first text block out of an Anthropic Messages API response.
+    private static func extractText(_ data: Data) -> String? {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = obj["content"] as? [[String: Any]] else { return nil }
+        let parts = content.compactMap { block -> String? in
+            (block["type"] as? String) == "text" ? block["text"] as? String : nil
+        }
+        let joined = parts.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        return joined.isEmpty ? nil : joined
+    }
+
+    /// Pull the error message out of an Anthropic API error response.
+    private static func extractAPIError(_ data: Data) -> String? {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let error = obj["error"] as? [String: Any],
+              let message = error["message"] as? String else { return nil }
+        return message
     }
 
     /// Find the tool's executable. Accepts an absolute path, or a bare name
