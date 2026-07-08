@@ -42,6 +42,13 @@ mkdir -p "${APP_DIR}/Contents/Resources"
 # Copy the executable into the bundle.
 cp "$BIN_PATH" "${APP_DIR}/Contents/MacOS/${BINARY}"
 
+# Copy the app icon in, if it exists.
+ICON_LINE=""
+if [[ -f "Resources/AppIcon.icns" ]]; then
+    cp "Resources/AppIcon.icns" "${APP_DIR}/Contents/Resources/AppIcon.icns"
+    ICON_LINE="    <key>CFBundleIconFile</key>       <string>AppIcon</string>"
+fi
+
 # Write the Info.plist that tells macOS how to treat this bundle.
 cat > "${APP_DIR}/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -59,6 +66,7 @@ cat > "${APP_DIR}/Contents/Info.plist" <<PLIST
     <key>NSHighResolutionCapable</key> <true/>
     <key>NSPrincipalClass</key>        <string>NSApplication</string>
     <key>LSApplicationCategoryType</key> <string>public.app-category.education</string>
+${ICON_LINE}
 </dict>
 </plist>
 PLIST
