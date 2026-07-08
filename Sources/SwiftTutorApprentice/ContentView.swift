@@ -30,11 +30,19 @@ struct ContentView: View {
                 onOpenSettings: { showingSettings = true }
             )
         } detail: {
-            LessonWorkspace(model: model, settings: model.settings)
+            LessonWorkspace(model: model, settings: model.settings, progress: model.progress)
                 .navigationTitle("SwiftTutor Apprentice")
                 .navigationSubtitle("Lesson \(model.currentLesson.id): \(model.currentLesson.title)")
         }
         .frame(minWidth: 1120, minHeight: 740)
+        // First-run welcome / onboarding.
+        .sheet(isPresented: Binding(
+            get: { !model.settings.hasSeenWelcome },
+            set: { if !$0 { model.settings.hasSeenWelcome = true } }
+        )) {
+            WelcomeView(onStart: { model.settings.hasSeenWelcome = true })
+                .interactiveDismissDisabled()
+        }
         // The in-app lesson editor: create/edit/reorder/delete lessons.
         .sheet(isPresented: $showingLessonEditor) {
             LessonEditorView(store: model.store, initialSelection: model.selectedLessonID)

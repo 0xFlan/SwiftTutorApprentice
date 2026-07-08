@@ -15,6 +15,9 @@ struct CodeEditorPanel: View {
     // and vice-versa. That's what `@Binding` means.
     @Binding var code: String
 
+    /// Faint text shown when the editor is empty (this lesson's starter).
+    let placeholder: String
+
     /// Reset the editor back to the lesson's starter line.
     let onInsertStarter: () -> Void
 
@@ -45,6 +48,17 @@ struct CodeEditorPanel: View {
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
                 )
+                // Faint placeholder showing the starter code when empty.
+                .overlay(alignment: .topLeading) {
+                    if code.isEmpty {
+                        Text(placeholder)
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundStyle(.secondary.opacity(0.45))
+                            .padding(.horizontal, 13)
+                            .padding(.vertical, 16)
+                            .allowsHitTesting(false)
+                    }
+                }
                 // Beginners shouldn't fight autocorrect while typing code.
                 .disableAutocorrection(true)
 

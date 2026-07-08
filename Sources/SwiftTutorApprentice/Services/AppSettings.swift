@@ -20,6 +20,7 @@ final class AppSettings: ObservableObject {
     private enum Keys {
         static let aiEnabled = "aiEnabled"
         static let aiCommand = "aiCommand"
+        static let hasSeenWelcome = "hasSeenWelcome"
     }
 
     /// Whether the optional AI coach is available. Off by default.
@@ -33,9 +34,15 @@ final class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(aiCommand, forKey: Keys.aiCommand) }
     }
 
+    /// Whether the learner has seen the first-run welcome.
+    @Published var hasSeenWelcome: Bool {
+        didSet { UserDefaults.standard.set(hasSeenWelcome, forKey: Keys.hasSeenWelcome) }
+    }
+
     init() {
         let defaults = UserDefaults.standard
         aiEnabled = defaults.bool(forKey: Keys.aiEnabled) // false if unset
         aiCommand = defaults.string(forKey: Keys.aiCommand) ?? "claude"
+        hasSeenWelcome = defaults.bool(forKey: Keys.hasSeenWelcome) // false if unset
     }
 }

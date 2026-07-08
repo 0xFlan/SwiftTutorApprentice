@@ -65,6 +65,16 @@ final class AppModel: ObservableObject {
             ?? Curriculum.defaultLessons[0]
     }
 
+    /// Position of the current lesson in the list, and neighbours.
+    private var currentIndex: Int {
+        store.lessons.firstIndex { $0.id == selectedLessonID } ?? 0
+    }
+    var hasPreviousLesson: Bool { currentIndex > 0 }
+    var hasNextLesson: Bool { currentIndex < store.lessons.count - 1 }
+
+    /// Whether the current lesson has been completed.
+    var currentLessonIsComplete: Bool { progress.isComplete(selectedLessonID) }
+
     /// Live coaching feedback for the current code + lesson.
     var coachFeedback: String {
         coach.feedback(for: code, lesson: currentLesson)
@@ -97,6 +107,18 @@ final class AppModel: ObservableObject {
     /// Fill the editor with the current lesson's starter code.
     func insertStarter() {
         code = currentLesson.starterCode
+    }
+
+    /// Move to the next lesson in the list (if any).
+    func goToNextLesson() {
+        guard hasNextLesson else { return }
+        selectLesson(store.lessons[currentIndex + 1].id)
+    }
+
+    /// Move to the previous lesson in the list (if any).
+    func goToPreviousLesson() {
+        guard hasPreviousLesson else { return }
+        selectLesson(store.lessons[currentIndex - 1].id)
     }
 
     /// Ask the optional AI coach about the current code. No-op if AI is off.
