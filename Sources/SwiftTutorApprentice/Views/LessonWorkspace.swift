@@ -47,15 +47,58 @@ struct LessonWorkspace: View {
 
             Divider()
 
-            // Bottom: prediction + run output.
-            RunOutputView(
-                prediction: $model.prediction,
-                runResult: model.runResult,
-                isRunning: model.isRunning,
-                onRun: model.run
-            )
-            .frame(minHeight: 220)
+            // Bottom: run bar for code lessons, or a read-only note for
+            // concept lessons (which the console runner can't execute).
+            if model.currentLessonIsConcept {
+                conceptFooter
+                    .frame(minHeight: 220)
+            } else {
+                RunOutputView(
+                    prediction: $model.prediction,
+                    runResult: model.runResult,
+                    isRunning: model.isRunning,
+                    onRun: model.run
+                )
+                .frame(minHeight: 220)
+            }
         }
+    }
+
+    private var conceptFooter: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Read-only concept lesson", systemImage: "book")
+                .font(.headline)
+                .foregroundStyle(Color.accentColor)
+
+            Text("""
+            This lesson is about understanding, not running. SwiftUI builds a \
+            graphical interface, which this app's console runner can't display — \
+            so there's no Run step. Read the lesson and the Syntax Lens on the \
+            left, then mark it read.
+            """)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack {
+                if progress.isComplete(model.selectedLessonID) {
+                    Label("Read", systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(.green)
+                } else {
+                    Button {
+                        model.markCurrentLessonRead()
+                    } label: {
+                        Label("Mark as read", systemImage: "checkmark")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                Spacer()
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var navigationBar: some View {

@@ -84,10 +84,17 @@ final class AppModel: ObservableObject {
     /// The current lesson's 1-based position.
     var currentDisplayNumber: Int { displayNumber(for: currentLesson) }
 
-    /// Live coaching feedback for the current code + lesson.
+    /// Live coaching feedback for the current code + lesson. For read-only
+    /// concept lessons there's no code to check, so we show the explanation.
     var coachFeedback: String {
-        coach.feedback(for: code, lesson: currentLesson)
+        if currentLesson.kind == .concept {
+            return currentLesson.successMessage.isEmpty ? currentLesson.hint : currentLesson.successMessage
+        }
+        return coach.feedback(for: code, lesson: currentLesson)
     }
+
+    /// Whether the current lesson is a read-only concept lesson (no run).
+    var currentLessonIsConcept: Bool { currentLesson.kind == .concept }
 
     // MARK: - Actions
 
@@ -128,6 +135,11 @@ final class AppModel: ObservableObject {
     func goToPreviousLesson() {
         guard hasPreviousLesson else { return }
         selectLesson(store.lessons[currentIndex - 1].id)
+    }
+
+    /// Mark the current lesson complete (used by read-only concept lessons).
+    func markCurrentLessonRead() {
+        progress.markComplete(selectedLessonID)
     }
 
     /// Ask the optional AI coach about the current code. No-op if AI is off.

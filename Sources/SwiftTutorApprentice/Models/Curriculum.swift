@@ -20,7 +20,8 @@ enum Curriculum {
         lesson1, lesson2, lesson3, lesson4, lesson5, lesson6, lesson7,
         lesson8, lesson9, lesson10, lesson11, lesson12, lesson13,
         lesson14, lesson15, lesson16, lesson17,
-        lesson18, lesson19, lesson20, lesson21, lesson22
+        lesson18, lesson19, lesson20, lesson21, lesson22,
+        lesson23, lesson24
     ]
 
     /// Convenience: find a default lesson by its id.
@@ -874,5 +875,83 @@ enum Curriculum {
         c.increment()
         print(c.count)
         """
+    )
+
+    // MARK: - Lesson 23: Your First SwiftUI View (read-only concept)
+
+    static let lesson23 = Lesson(
+        id: 23,
+        title: "Your First SwiftUI View",
+        goal: "See how a SwiftUI screen is just a struct that describes what to show.",
+        starterCode: "import SwiftUI\n\nstruct HelloView: View {\n    var body: some View {\n        Text(\"Hello, SwiftUI!\")\n    }\n}",
+        teaches: ["SwiftUI", "View", "body", "declarative UI"],
+        glossaryTerms: ["SwiftUI", "View", "struct", "property", "String"],
+        syntaxTokens: [
+            SyntaxToken(id: 0, display: "import SwiftUI", explanation: "Brings in Apple's SwiftUI framework so you can build a user interface."),
+            SyntaxToken(id: 1, display: "struct HelloView", explanation: "Every SwiftUI screen or component is a struct — your own value type."),
+            SyntaxToken(id: 2, display: ": View", explanation: "Says this struct is a View: something SwiftUI knows how to display."),
+            SyntaxToken(id: 3, display: "var body", explanation: "A required property that describes what the view shows."),
+            SyntaxToken(id: 4, display: "some View", explanation: "The type of body — \"some kind of View\". You return your UI here."),
+            SyntaxToken(id: 5, display: "Text(\"Hello, SwiftUI!\")", explanation: "A built-in view that displays a piece of text on screen.")
+        ],
+        syntaxWhy: """
+        This is a read-only lesson: SwiftUI builds a graphical interface, which \
+        this app's console runner can't display — so there's nothing to Run. \
+        You've already met most of these pieces.
+
+        The big idea is DECLARATIVE UI: you don't write step-by-step drawing \
+        commands. You describe what the screen should contain (a Text view), and \
+        SwiftUI figures out how to draw it. A view is a struct whose body \
+        property returns that description. Notice how much this reuses what you \
+        already know — struct, property, String, function-like calls.
+        """,
+        expectedOutput: "",
+        successMarkers: [],
+        successMessage: """
+        A SwiftUI view is just a struct that conforms to View and has a body \
+        describing what to show. You declare WHAT you want on screen (here, some \
+        Text), and SwiftUI handles the drawing. This is the shape of every real \
+        Apple-platform UI you'll build next.
+        """,
+        hint: "This is a read-only concept lesson — read the breakdown, then mark it read.",
+        kind: .concept
+    )
+
+    // MARK: - Lesson 24: Making It Interactive (read-only concept)
+
+    static let lesson24 = Lesson(
+        id: 24,
+        title: "Making It Interactive (State)",
+        goal: "Understand how SwiftUI updates the screen when your data changes.",
+        starterCode: "import SwiftUI\n\nstruct CounterView: View {\n    @State private var count = 0\n    var body: some View {\n        Button(\"Count: \\(count)\") {\n            count += 1\n        }\n    }\n}",
+        teaches: ["@State", "reactive UI", "Button", "closure"],
+        glossaryTerms: ["SwiftUI", "State", "closure", "property", "Int"],
+        syntaxTokens: [
+            SyntaxToken(id: 0, display: "@State", explanation: "Tells SwiftUI to watch this value. When it changes, the view redraws automatically."),
+            SyntaxToken(id: 1, display: "private var count = 0", explanation: "The piece of data this view owns and displays."),
+            SyntaxToken(id: 2, display: "Button(\"Count: \\(count)\")", explanation: "A tappable button whose label uses string interpolation to show the count."),
+            SyntaxToken(id: 3, display: "{ count += 1 }", explanation: "A closure — the code that runs when the button is tapped. It changes count.")
+        ],
+        syntaxWhy: """
+        Another read-only concept lesson — there's nothing to Run, since this \
+        draws a button rather than printing text.
+
+        Here's the magic of SwiftUI: you mark data with @State, and when that data \
+        changes, SwiftUI automatically redraws the parts of the screen that use \
+        it. Tapping the button runs the closure, which does count += 1; because \
+        count is @State, the button's label updates on its own. You never write \
+        "update the label" code — you describe the relationship and SwiftUI keeps \
+        the screen in sync. Every reactive Apple app is built on this idea.
+        """,
+        expectedOutput: "",
+        successMarkers: [],
+        successMessage: """
+        @State connects your data to the screen. Change the value and SwiftUI \
+        redraws automatically — no manual UI-updating code. The button's closure \
+        changes count, and the label follows. This reactive model is the heart of \
+        SwiftUI app development.
+        """,
+        hint: "This is a read-only concept lesson — read the breakdown, then mark it read.",
+        kind: .concept
     )
 }

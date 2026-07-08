@@ -93,6 +93,22 @@ final class LessonStore: ObservableObject {
             return
         }
         lessons = decoded
+        mergeMissingDefaults()
+    }
+
+    /// Append any built-in lessons the saved file doesn't have yet (matched by
+    /// id). This lets a returning learner pick up newly added curriculum
+    /// lessons without losing edits they've made to existing ones.
+    ///
+    /// Trade-off: a built-in lesson the learner deleted will reappear on the
+    /// next launch. That's an acceptable choice for a curriculum app — use the
+    /// editor to remove it again if needed.
+    private func mergeMissingDefaults() {
+        let existingIDs = Set(lessons.map(\.id))
+        let missing = Curriculum.defaultLessons.filter { !existingIDs.contains($0.id) }
+        guard !missing.isEmpty else { return }
+        lessons.append(contentsOf: missing)
+        save()
     }
 
     private func save() {

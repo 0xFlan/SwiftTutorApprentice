@@ -596,6 +596,48 @@ enum Glossary {
 
             This keeps error paths visible instead of failing silently.
             """
+        ),
+
+        // MARK: SwiftUI concepts
+
+        GlossaryEntry(
+            term: "SwiftUI",
+            short: "Apple's framework for building user interfaces.",
+            deep: """
+            SwiftUI is Apple's modern framework for building the screens of an \
+            app. You describe WHAT the interface should contain, and SwiftUI \
+            draws and updates it for you (a "declarative" style).
+
+            You write SwiftUI in Swift — everything you've learned (structs, \
+            properties, closures) is exactly what SwiftUI is built from.
+            """
+        ),
+        GlossaryEntry(
+            term: "View",
+            short: "Anything SwiftUI can display on screen.",
+            deep: """
+            In SwiftUI, a View is anything that can be shown — a piece of text, a \
+            button, an image, or a whole screen made of smaller views.
+
+            You make one by writing a struct that conforms to View and provides a \
+            body describing what it shows:
+
+            struct HelloView: View { var body: some View { Text("Hi") } }
+            """
+        ),
+        GlossaryEntry(
+            term: "State",
+            short: "Data SwiftUI watches so the screen updates when it changes.",
+            deep: """
+            @State marks a piece of data that a view owns. When you change a \
+            @State value, SwiftUI automatically redraws the parts of the screen \
+            that depend on it — you never write "update the UI" code yourself.
+
+            @State private var count = 0
+
+            This automatic-redraw idea is the heart of how SwiftUI apps stay in \
+            sync with their data.
+            """
         )
     ]
 }

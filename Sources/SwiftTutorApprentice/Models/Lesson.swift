@@ -12,6 +12,15 @@
 
 import Foundation
 
+/// What kind of lesson this is.
+/// - `code`: the learner types Swift and runs it (the normal loop).
+/// - `concept`: a read-only lesson for ideas the local runner can't execute
+///   (e.g. SwiftUI, which builds a UI rather than console output).
+enum LessonKind: String, Codable {
+    case code
+    case concept
+}
+
 /// The teaching content for one lesson.
 ///
 /// Properties are `var` so the in-app lesson editor can change them.
@@ -47,9 +56,44 @@ struct Lesson: Identifiable, Hashable, Codable {
     /// small formatting differences don't trip beginners up.
     var successMarkers: [String]
 
-    /// Shown by the Live Coach when the code looks right.
+    /// Shown by the Live Coach when the code looks right. For `concept`
+    /// lessons this doubles as the main explanation.
     var successMessage: String
 
     /// Shown by the Live Coach as a nudge when the code isn't there yet.
     var hint: String
+
+    /// Runnable code lesson (default) or read-only concept lesson.
+    /// Defaults to `.code` so existing call sites and older saved files
+    /// (which have no `kind` field) keep working.
+    var kind: LessonKind = .code
+}
+
+// Custom decoding lives in an extension so the memberwise initializer is still
+// synthesized (Curriculum literals rely on it). This tolerates older
+// lessons.json files that predate the `kind` field — a missing `kind` decodes
+// to `.code` instead of failing the whole load.
+extension Lesson {
+    private enum CodingKeys: String, CodingKey {
+        case id, title, goal, starterCode, teaches, glossaryTerms,
+             syntaxTokens, syntaxWhy, expectedOutput, successMarkers,
+             successMessage, hint, kind
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        goal = try c.decode(String.self, forKey: .goal)
+        starterCode = try c.decode(String.self, forKey: .starterCode)
+        teaches = try c.decode([String].self, forKey: .teaches)
+        glossaryTerms = try c.decode([String].self, forKey: .glossaryTerms)
+        syntaxTokens = try c.decode([SyntaxToken].self, forKey: .syntaxTokens)
+        syntaxWhy = try c.decode(String.self, forKey: .syntaxWhy)
+        expectedOutput = try c.decode(String.self, forKey: .expectedOutput)
+        successMarkers = try c.decode([String].self, forKey: .successMarkers)
+        successMessage = try c.decode(String.self, forKey: .successMessage)
+        hint = try c.decode(String.self, forKey: .hint)
+        kind = try c.decodeIfPresent(LessonKind.self, forKey: .kind) ?? .code
+    }
 }
