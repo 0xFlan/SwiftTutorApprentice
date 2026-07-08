@@ -9,6 +9,7 @@ import SwiftUI
 
 struct LessonWorkspace: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var settings: AppSettings
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,8 +25,15 @@ struct LessonWorkspace: View {
                 )
                 .frame(minWidth: 320, idealWidth: 420)
 
-                LiveCoachPanel(feedback: model.coachFeedback)
-                    .frame(minWidth: 280, idealWidth: 320)
+                LiveCoachPanel(
+                    feedback: model.coachFeedback,
+                    aiEnabled: settings.aiEnabled,
+                    isAskingAI: model.isAskingAI,
+                    aiResponse: model.aiResponse,
+                    aiError: model.aiError,
+                    onAskAI: model.askAI
+                )
+                .frame(minWidth: 280, idealWidth: 320)
             }
             .frame(minHeight: 360)
 

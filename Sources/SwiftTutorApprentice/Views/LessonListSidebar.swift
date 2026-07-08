@@ -14,6 +14,8 @@ struct LessonListSidebar: View {
 
     /// Called when the learner taps the "Manage lessons" button.
     let onManageLessons: () -> Void
+    /// Called when the learner taps the settings button.
+    let onOpenSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -57,6 +59,14 @@ struct LessonListSidebar: View {
                         .frame(maxWidth: .infinity)
                 }
                 .help("Add, edit, reorder, or delete lessons — all inside the app")
+
+                Button {
+                    onOpenSettings()
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                        .frame(maxWidth: .infinity)
+                }
+                .help("Preferences, including the optional AI coach")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)

@@ -26,9 +26,13 @@ final class AppModel: ObservableObject {
     /// Persistent record of which lessons are complete.
     let progress = ProgressStore()
 
+    /// App preferences (including the optional AI coach toggle).
+    let settings = AppSettings()
+
     // Plain helpers with no state of their own.
     private let coach = LiveCoach()
     private let runner = SwiftRunner()
+    private let aiCoach = AICoach()
 
     // MARK: - Published state (views redraw when these change)
 
@@ -37,6 +41,11 @@ final class AppModel: ObservableObject {
     @Published var prediction: String = ""
     @Published var runResult: RunResult?
     @Published var isRunning = false
+
+    /// Optional AI coach output (nil until the learner asks).
+    @Published var aiResponse: String?
+    @Published var aiError: String?
+    @Published var isAskingAI = false
 
     init() {
         // Start on the first lesson.
@@ -70,6 +79,8 @@ final class AppModel: ObservableObject {
         code = ""
         prediction = ""
         runResult = nil
+        aiResponse = nil
+        aiError = nil
     }
 
     /// After the lesson list changes (edits/deletes/reorder), make sure the
@@ -86,6 +97,27 @@ final class AppModel: ObservableObject {
     /// Fill the editor with the current lesson's starter code.
     func insertStarter() {
         code = currentLesson.starterCode
+    }
+
+    /// Ask the optional AI coach about the current code. No-op if AI is off.
+    func askAI() {
+        guard settings.aiEnabled, !isAskingAI else { return }
+        isAskingAI = true
+        aiResponse = nil
+        aiError = nil
+        let codeToSend = code
+        let lesson = currentLesson
+        let command = settings.aiCommand
+
+        Task {
+            let result = await aiCoach.explain(code: codeToSend, lesson: lesson, command: command)
+            self.isAskingAI = false
+            if let error = result.errorMessage {
+                self.aiError = error
+            } else {
+                self.aiResponse = result.text
+            }
+        }
     }
 
     /// Run the code locally, then update the UI and progress.

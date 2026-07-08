@@ -18,6 +18,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var model = AppModel()
     @State private var showingLessonEditor = false
+    @State private var showingSettings = false
 
     var body: some View {
         NavigationSplitView {
@@ -25,10 +26,11 @@ struct ContentView: View {
                 model: model,
                 store: model.store,
                 progress: model.progress,
-                onManageLessons: { showingLessonEditor = true }
+                onManageLessons: { showingLessonEditor = true },
+                onOpenSettings: { showingSettings = true }
             )
         } detail: {
-            LessonWorkspace(model: model)
+            LessonWorkspace(model: model, settings: model.settings)
                 .navigationTitle("SwiftTutor Apprentice")
                 .navigationSubtitle("Lesson \(model.currentLesson.id): \(model.currentLesson.title)")
         }
@@ -36,6 +38,10 @@ struct ContentView: View {
         // The in-app lesson editor: create/edit/reorder/delete lessons.
         .sheet(isPresented: $showingLessonEditor) {
             LessonEditorView(store: model.store, initialSelection: model.selectedLessonID)
+        }
+        // In-app settings (including the optional AI coach).
+        .sheet(isPresented: $showingSettings) {
+            SettingsView(settings: model.settings)
         }
         // If lessons changed while editing, keep the selection valid.
         .onChange(of: model.store.lessons) {
