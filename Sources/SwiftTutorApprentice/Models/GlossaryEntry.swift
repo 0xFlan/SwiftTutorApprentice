@@ -371,6 +371,133 @@ enum Glossary {
             usually means something went wrong. Command-line tools use this number \
             to decide what to do next.
             """
+        ),
+
+        // MARK: More fundamentals
+
+        GlossaryEntry(
+            term: "else",
+            short: "The code to run when an if condition is false.",
+            deep: """
+            else attaches to an if. It provides the code that runs when the if's \
+            condition is false.
+
+            if hour < 12 { ... } else { ... }
+
+            Exactly one of the two blocks runs. You can also chain else if to test \
+            more conditions in turn.
+            """
+        ),
+        GlossaryEntry(
+            term: "Double",
+            short: "A number with a decimal point, like 1.5.",
+            deep: """
+            A Double holds a number that can have a fractional part: 1.5, 3.14, \
+            2.0. The decimal point is what makes it a Double rather than an Int.
+
+            Use Int for whole-number counts, and Double for measurements, prices, \
+            and anything that needs fractions.
+            """
+        ),
+        GlossaryEntry(
+            term: "array",
+            short: "An ordered list of values, written in [ ].",
+            deep: """
+            An array is a single value that holds many values in order, written \
+            inside square brackets: ["Alex", "Sam", "Jo"].
+
+            You read items by their index (position): names[0] is the first item. \
+            Indexes start at 0. Arrays are one of the most-used tools in Swift.
+            """
+        ),
+        GlossaryEntry(
+            term: "index",
+            short: "A position in an array. Counting starts at 0.",
+            deep: """
+            An index is the position of an item in an array. Swift counts from 0, \
+            so the first item is at index 0, the second at index 1, and so on.
+
+            names[0] means "the item at index 0" — the first one. Asking for an \
+            index that doesn't exist (like names[99] on a short array) crashes, so \
+            indexes must be valid.
+            """
+        ),
+        GlossaryEntry(
+            term: "loop",
+            short: "Code that repeats, e.g. once per item with for-in.",
+            deep: """
+            A loop runs the same block of code multiple times. A for-in loop runs \
+            once for each item in a collection:
+
+            for name in names { print(name) }
+
+            Each time around, the loop variable (name) holds the next item. Loops \
+            save you from copy-pasting the same code over and over.
+            """
+        ),
+        GlossaryEntry(
+            term: "optional",
+            short: "A value that might be there, or might be nil (nothing).",
+            deep: """
+            An optional can hold a value OR hold nothing (nil). You mark a type \
+            optional with a ?: String? is "a String or nothing".
+
+            Swift forces you to handle the "nothing" case, which prevents a whole \
+            category of crashes. A common way to safely use one is if let:
+
+            if let name = maybeName { /* runs only if there's a value */ }
+            """
+        ),
+        GlossaryEntry(
+            term: "dictionary",
+            short: "Values stored under keys you choose, like a lookup table.",
+            deep: """
+            A dictionary stores key: value pairs. Instead of finding items by \
+            position (like an array), you find them by a key you choose:
+
+            let ages = ["Alex": 30, "Sam": 25]
+            ages["Alex"]   // looks up 30 by the key "Alex"
+
+            Great for "look something up by name/id" situations.
+            """
+        ),
+        GlossaryEntry(
+            term: "struct",
+            short: "Your own type that groups related values together.",
+            deep: """
+            A struct lets you define a new type that bundles related values \
+            (called properties) into one thing:
+
+            struct Dog { let name: String }
+
+            You then create instances from it: Dog(name: "Rex"). Structs are \
+            central to Swift and SwiftUI — even a View is a struct.
+            """
+        ),
+        GlossaryEntry(
+            term: "property",
+            short: "A named value that belongs to a struct or type.",
+            deep: """
+            A property is a value stored inside a type. In struct Dog { let name: \
+            String }, name is a property — every Dog has one.
+
+            You read a property with dot syntax: rex.name. Properties are how a \
+            type remembers its data.
+            """
+        ),
+        GlossaryEntry(
+            term: "return",
+            short: "Sends a value back from a function to its caller.",
+            deep: """
+            return hands a value back to whoever called the function, and ends the \
+            function right there.
+
+            func double(_ n: Int) -> Int { return n * 2 }
+
+            The -> Int part declares what type comes back. double(5) becomes 10 at \
+            the place it was called. Returning values lets functions compute \
+            results you can use elsewhere.
+            """
         )
     ]
 }
