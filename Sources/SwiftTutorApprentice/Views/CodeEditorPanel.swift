@@ -39,9 +39,8 @@ struct CodeEditorPanel: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            TextEditor(text: $code)
-                .font(.system(.body, design: .monospaced))
-                .padding(8)
+            CodeTextView(text: $code)
+                .frame(minHeight: 160)
                 .background(Color(nsColor: .textBackgroundColor))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
@@ -59,8 +58,6 @@ struct CodeEditorPanel: View {
                             .allowsHitTesting(false)
                     }
                 }
-                // Beginners shouldn't fight autocorrect while typing code.
-                .disableAutocorrection(true)
 
             Text("Saved to ~/Developer/SwiftTutorApprentice/Workspace/main.swift when you Run.")
                 .font(.caption2)
