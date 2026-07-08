@@ -77,9 +77,15 @@ struct LessonPanel: View {
                 Divider()
 
                 // --- Syntax Lens for this lesson's key line ---
+                // Use the lesson's curated tokens if present; otherwise generate
+                // a breakdown automatically from the starter code.
                 SyntaxLensView(
-                    tokens: lesson.syntaxTokens,
-                    whyExplanation: lesson.syntaxWhy
+                    tokens: lesson.syntaxTokens.isEmpty
+                        ? SyntaxTokenizer.tokenize(lesson.starterCode)
+                        : lesson.syntaxTokens,
+                    whyExplanation: lesson.syntaxWhy.isEmpty
+                        ? SyntaxTokenizer.autoWhy
+                        : lesson.syntaxWhy
                 )
 
                 Spacer(minLength: 0)

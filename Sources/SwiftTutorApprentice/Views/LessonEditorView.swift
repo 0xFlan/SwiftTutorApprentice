@@ -190,6 +190,13 @@ struct LessonEditorView: View {
                     .font(.headline)
                 Spacer()
                 Button {
+                    draft.syntaxTokens = SyntaxTokenizer.tokenize(draft.starterCode)
+                } label: {
+                    Label("Auto-generate", systemImage: "wand.and.stars")
+                }
+                .buttonStyle(.borderless)
+                .help("Generate tokens automatically from the starter code")
+                Button {
                     let nextID = (draft.syntaxTokens.map(\.id).max() ?? -1) + 1
                     draft.syntaxTokens.append(SyntaxToken(id: nextID, display: "", explanation: ""))
                 } label: {
@@ -197,7 +204,7 @@ struct LessonEditorView: View {
                 }
                 .buttonStyle(.borderless)
             }
-            Text("Break the key line into pieces the learner can tap. Left = what shows on the chip; right = the explanation.")
+            Text("Break the key line into pieces the learner can tap. Left = what shows on the chip; right = the explanation. Leave empty to auto-generate a breakdown at runtime.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
