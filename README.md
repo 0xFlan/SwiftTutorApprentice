@@ -4,7 +4,8 @@ A private, local macOS app for learning Swift by hand. Not a chatbot: it
 teaches you to *understand* code — what you typed, what each part means, why
 Swift needs the syntax, and what happens when it runs.
 
-Fully offline. No AI, accounts, backend, or network.
+Everything happens **inside the app**: reading, typing, running, tracking
+progress, and even authoring your own lessons. No terminal needed to use it.
 
 ## Requirements
 
@@ -13,7 +14,8 @@ Fully offline. No AI, accounts, backend, or network.
 
 ## Open it as a normal app (recommended)
 
-Build a double-clickable `.app` bundle:
+Build a double-clickable `.app` bundle (this one-time step uses the terminal;
+using the app afterwards does not):
 
 ```bash
 cd ~/Developer/SwiftTutorApprentice
@@ -21,81 +23,78 @@ cd ~/Developer/SwiftTutorApprentice
 ```
 
 Then open `dist/SwiftTutor Apprentice.app` from Finder (drag it to your
-Applications folder to keep it around). Re-run the script after any code change.
+Applications folder to keep it). Re-run the script after any code change.
 
 First launch may show a Gatekeeper prompt because the app isn't from the App
 Store — right-click the app → **Open** → **Open**, or approve it in
 **System Settings → Privacy & Security**.
 
-## Or run it from the terminal
+To run from the terminal instead: `swift run SwiftTutorApprentice`.
 
-```bash
-swift build
-swift run SwiftTutorApprentice
-```
+## What it does
 
-## The curriculum
+**A complete beginner Swift curriculum (17 lessons)** that builds up step by
+step:
 
-Seven fundamentals lessons that build on each other:
+1. Printing Text · 2. Constants (`let`) · 3. Variables (`var`) ·
+4. String Interpolation · 5. Math · 6. `if` · 7. Functions ·
+8. `if`/`else` · 9. `Double` · 10. Bool logic · 11. Arrays · 12. Loops ·
+13. Optionals · 14. Dictionaries · 15. Structs · 16. Function parameters ·
+17. Return values
 
-1. Printing Text in Swift — `print`
-2. Storing Text in a Constant — `let`
-3. Variables You Can Change — `var`
-4. Combining Text with Interpolation — `\(  )`
-5. Numbers and Simple Math — `Int`, operators
-6. Making Decisions with `if` — `Bool`, conditions, braces
-7. Writing Your Own Function — `func`
+**The learning loop, every lesson:**
 
-Pick any lesson from the sidebar. Completed lessons get a green checkmark, and
-your progress is saved between launches.
+1. Read the lesson (left): goal, what to type, clickable glossary terms, and a
+   Syntax Lens that breaks the key line into tappable pieces.
+2. Type the code by hand (middle) — a faint placeholder shows the starter.
+3. Watch the Live Coach react as you type (right): it flags missing
+   quotes/parentheses/braces and confirms when the code looks right.
+4. Predict the output (bottom bar).
+5. Run it (**⌘R**). See real `stdout`, `stderr`, and exit code, a
+   plain-language explanation, and whether your prediction matched.
+6. A clean run that matches the lesson's expected output marks it complete
+   (green check in the sidebar). Move between lessons with **⌘[** / **⌘]**.
 
-## The learning loop (every lesson)
+**Author your own lessons — no files, no terminal.** Click **Manage lessons**
+in the sidebar to add, edit, reorder, and delete lessons (title, code, terms,
+syntax tokens, coach text, expected output). Everything saves automatically.
+**Restore default lessons** brings back the built-in curriculum.
 
-1. Read the lesson (left panel): goal, what to type, terms, and a Syntax Lens
-   that breaks the key line into clickable pieces.
-2. Type the code by hand (middle panel).
-3. Watch the Live Coach react as you type (right panel): it flags missing
-   quotes/parentheses/braces and tells you when the code looks right.
-4. Hover or click glossary terms and syntax tokens to learn the vocabulary.
-5. Write a **prediction** of the output (bottom bar).
-6. Press **Run** (or ⌘R).
-7. See real `stdout`, `stderr`, and the `exit code`, plus a plain-language
-   explanation and whether your prediction matched. A clean run that produces
-   the lesson's expected output marks the lesson complete automatically.
+**Optional AI coach (off by default).** In **Settings** you can enable an
+"Ask the AI coach" button that sends the current lesson and your code to your
+local `claude` CLI (or any command you specify) for extra explanation. The
+rule-based coach always works offline; AI is purely additive and only runs
+when you turn it on and press the button.
 
 ## Where things are stored
 
-- Code you run is written to and executed from
-  `~/Developer/SwiftTutorApprentice/Workspace/main.swift`
-- Progress is saved as readable JSON at
-  `~/Library/Application Support/SwiftTutorApprentice/progress.json`
-  (the sidebar's **Reset** button clears it)
+- Code you run: `~/Developer/SwiftTutorApprentice/Workspace/main.swift`
+- Your lessons: `~/Library/Application Support/SwiftTutorApprentice/lessons.json`
+- Progress: `~/Library/Application Support/SwiftTutorApprentice/progress.json`
 
 ## Project layout
 
-- `Models/` — `Lesson`, `Curriculum` (all lesson content), `GlossaryEntry`,
-  `SyntaxToken`. The whole app is driven by this data.
-- `Services/` — `SwiftRunner` (runs your code), `LiveCoach` (rule-based
-  feedback), `ProgressStore` (saves completion).
+- `Models/` — `Lesson`, `Curriculum` (default lessons), `GlossaryEntry`,
+  `SyntaxToken`. Data-driven: a lesson is just data.
+- `Services/` — `SwiftRunner` (runs code), `LiveCoach` (rule-based feedback),
+  `AICoach` (optional CLI-based AI), `LessonStore` (JSON lessons),
+  `ProgressStore`, `AppSettings`.
 - `AppModel.swift` — shared state (view model).
-- `Views/` — the sidebar, the three panels, and the run/output bar.
+- `Views/` — sidebar, three panels, run/output bar, lesson editor, settings,
+  welcome.
+- `Scripts/` — `build-app.sh` (package the `.app`), `make-icon.sh` +
+  `make-icon.swift` (regenerate the icon).
 
 ## Note on sandboxed shells
 
-If you ever see `sandbox-exec: sandbox_apply: Operation not permitted` when
-building, your shell is itself inside a sandbox that blocks the one SwiftPM
-starts. Add `--disable-sandbox` (already used by `build-app.sh`):
+If you see `sandbox-exec: sandbox_apply: Operation not permitted` when
+building, your shell is inside a sandbox that blocks the one SwiftPM starts.
+Add `--disable-sandbox` (`build-app.sh` already does). A normal Terminal
+doesn't need it.
 
-```bash
-swift build --disable-sandbox
-swift run --disable-sandbox SwiftTutorApprentice
-```
+## Still deferred (future ideas)
 
-On a normal Terminal this isn't needed.
-
-## Intentionally not here yet
-
-No AI/Codex/Claude integration, no accounts, backend, cloud sync, database,
-networking, or syntax highlighting. See the `TODO:` comments in the source for
-the planned next steps.
+API-key AI provider as an alternative to the CLI; a "review my whole project"
+action; automatic Syntax Lens tokenizing for arbitrary lines; SwiftUI-app
+lessons. See the `TODO:` comments in the source.
 ```
