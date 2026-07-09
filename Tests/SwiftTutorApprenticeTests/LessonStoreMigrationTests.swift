@@ -56,6 +56,11 @@ final class LessonStoreMigrationTests: XCTestCase {
         XCTAssertEqual(store.lessons.map(\.id), [secondStockLesson.id, editedLesson.id])
         XCTAssertEqual(store.lessons[0], secondStockLesson)
         XCTAssertEqual(store.lessons[1], expectedEditedLesson)
+
+        let persistedLessons = try readLessons()
+        XCTAssertEqual(persistedLessons.map(\.id), [secondStockLesson.id, editedLesson.id])
+        XCTAssertEqual(persistedLessons[0], secondStockLesson)
+        XCTAssertEqual(persistedLessons[1], expectedEditedLesson)
     }
 
     func testBuiltInIDWithDifferentStarterCodeDoesNotReceiveStockDeepContent() throws {
@@ -74,6 +79,36 @@ final class LessonStoreMigrationTests: XCTestCase {
         XCTAssertNil(store.lessons[0].deepContent)
     }
 
+    func testBuiltInIDAndStarterCodeWithDifferentKindDoesNotReceiveStockDeepContent() throws {
+        var stockLesson = Curriculum.defaultLessons[0]
+        stockLesson.deepContent = pilotDeepContent(title: "Stock deep content")
+
+        var customizedLesson = stockLesson
+        customizedLesson.kind = .concept
+        customizedLesson.deepContent = nil
+        try writeLessons([customizedLesson])
+
+        let store = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
+
+        XCTAssertEqual(store.lessons, [customizedLesson])
+        XCTAssertEqual(try readLessons(), [customizedLesson])
+    }
+
+    func testSavedDeepContentIsPreservedInsteadOfReplacingItWithStockContent() throws {
+        var stockLesson = Curriculum.defaultLessons[0]
+        stockLesson.deepContent = pilotDeepContent(title: "Stock deep content")
+
+        var customizedLesson = stockLesson
+        customizedLesson.deepContent = pilotDeepContent(title: "My deep content")
+        try writeLessons([customizedLesson])
+
+        let store = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
+
+        XCTAssertEqual(store.lessons, [customizedLesson])
+        XCTAssertEqual(store.lessons[0].deepContent?.title, "My deep content")
+        XCTAssertEqual(try readLessons(), [customizedLesson])
+    }
+
     func testMissingDefaultIsAppendedOnceAndExistingOrderIsPreservedAcrossReopen() throws {
         let firstStockLesson = Curriculum.defaultLessons[0]
         let missingStockLesson = Curriculum.defaultLessons[1]
@@ -87,6 +122,10 @@ final class LessonStoreMigrationTests: XCTestCase {
         XCTAssertEqual(
             firstStore.lessons.map(\.id),
             [customLesson.id, firstStockLesson.id, missingStockLesson.id]
+        )
+        XCTAssertEqual(
+            try readLessons(),
+            [customLesson, firstStockLesson, missingStockLesson]
         )
 
         let reopenedStore = LessonStore(fileURL: fixtureURL, defaults: defaults)
