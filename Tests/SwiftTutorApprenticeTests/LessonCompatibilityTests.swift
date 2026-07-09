@@ -46,7 +46,20 @@ final class LessonCompatibilityTests: XCTestCase {
         XCTAssertNil(lesson.deepContent)
     }
 
-    func testDeepLessonContentRoundTrips() throws {
+    func testMalformedRequiredLegacyFieldStillThrowsDecodingError() throws {
+        var malformedLesson = lessonJSONObject(id: 42)
+        malformedLesson["id"] = "not an integer"
+        let data = try JSONSerialization.data(withJSONObject: malformedLesson)
+
+        XCTAssertThrowsError(try JSONDecoder().decode(Lesson.self, from: data)) { error in
+            guard case DecodingError.typeMismatch = error else {
+                XCTFail("Expected DecodingError.typeMismatch, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testLessonWithDeepContentRoundTrips() throws {
         let content = LessonDeepContent(
             title: "Printing in detail",
             introduction: "Learn what every part of a print call does.",
@@ -91,11 +104,28 @@ final class LessonCompatibilityTests: XCTestCase {
                 )
             ]
         )
+        let lesson = Lesson(
+            id: 73,
+            title: "Deep printing",
+            goal: "Understand a print call",
+            starterCode: "print(\"Hello\")",
+            teaches: ["print", "String literals"],
+            glossaryTerms: ["String"],
+            syntaxTokens: [],
+            syntaxWhy: "Parentheses contain the function input.",
+            expectedOutput: "Hello",
+            successMarkers: ["print(", "Hello"],
+            successMessage: "The print call is complete.",
+            hint: "Keep the text inside parentheses.",
+            kind: .code,
+            deepContent: content
+        )
 
-        let encoded = try JSONEncoder().encode(content)
-        let decoded = try JSONDecoder().decode(LessonDeepContent.self, from: encoded)
+        let encoded = try JSONEncoder().encode(lesson)
+        let decoded = try JSONDecoder().decode(Lesson.self, from: encoded)
 
-        XCTAssertEqual(decoded, content)
+        XCTAssertEqual(decoded, lesson)
+        XCTAssertEqual(decoded.deepContent, content)
     }
 
     private func legacyLessonsFixtureData() throws -> Data {
@@ -110,6 +140,12 @@ final class LessonCompatibilityTests: XCTestCase {
     }
 
     private func lessonData(id: Int, deepContent: Any? = nil) throws -> Data {
+        try JSONSerialization.data(
+            withJSONObject: [lessonJSONObject(id: id, deepContent: deepContent)]
+        )
+    }
+
+    private func lessonJSONObject(id: Int, deepContent: Any? = nil) -> [String: Any] {
         var lesson: [String: Any] = [
             "id": id,
             "title": "Legacy custom lesson",
@@ -127,6 +163,6 @@ final class LessonCompatibilityTests: XCTestCase {
         if let deepContent {
             lesson["deepContent"] = deepContent
         }
-        return try JSONSerialization.data(withJSONObject: [lesson])
+        return lesson
     }
 }
