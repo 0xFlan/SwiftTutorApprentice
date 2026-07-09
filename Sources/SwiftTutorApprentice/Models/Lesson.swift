@@ -67,6 +67,10 @@ struct Lesson: Identifiable, Hashable, Codable {
     /// Defaults to `.code` so existing call sites and older saved files
     /// (which have no `kind` field) keep working.
     var kind: LessonKind = .code
+
+    /// Optional concept-first teaching content for supported lessons.
+    /// Defaults to `nil` so legacy and custom lessons keep their current flow.
+    var deepContent: LessonDeepContent? = nil
 }
 
 // Custom decoding lives in an extension so the memberwise initializer is still
@@ -77,7 +81,7 @@ extension Lesson {
     private enum CodingKeys: String, CodingKey {
         case id, title, goal, starterCode, teaches, glossaryTerms,
              syntaxTokens, syntaxWhy, expectedOutput, successMarkers,
-             successMessage, hint, kind
+             successMessage, hint, kind, deepContent
     }
 
     init(from decoder: Decoder) throws {
@@ -95,5 +99,13 @@ extension Lesson {
         successMessage = try c.decode(String.self, forKey: .successMessage)
         hint = try c.decode(String.self, forKey: .hint)
         kind = try c.decodeIfPresent(LessonKind.self, forKey: .kind) ?? .code
+        do {
+            deepContent = try c.decodeIfPresent(
+                LessonDeepContent.self,
+                forKey: .deepContent
+            )
+        } catch {
+            deepContent = nil
+        }
     }
 }

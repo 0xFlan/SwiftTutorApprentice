@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "title": "My preserved Printing title",
+    "goal": "My preserved goal",
+    "starterCode": "print(\"Hello, Swift!\")",
+    "teaches": ["print"],
+    "glossaryTerms": ["String"],
+    "syntaxTokens": [],
+    "syntaxWhy": "My preserved syntax note",
+    "expectedOutput": "Hello, Swift!",
+    "successMarkers": ["print("],
+    "successMessage": "My preserved success message",
+    "hint": "My preserved hint"
+  }
+]
