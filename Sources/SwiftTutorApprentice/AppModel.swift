@@ -16,6 +16,7 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -47,9 +48,23 @@ final class AppModel: ObservableObject {
     @Published var aiError: String?
     @Published var isAskingAI = false
 
+    // Keeps the forwarding subscriptions alive.
+    private var cancellables = Set<AnyCancellable>()
+
     init() {
         // Start on the first lesson.
         selectedLessonID = store.lessons.first?.id ?? 1
+
+        // Forward changes from the nested stores so any view observing this
+        // AppModel also redraws when the store, progress, or settings change.
+        // Without this, a view that observes only `model` (like ContentView)
+        // won't react to nested-object changes — the bug behind the welcome
+        // sheet not dismissing.
+        for publisher in [store.objectWillChange, progress.objectWillChange, settings.objectWillChange] {
+            publisher
+                .sink { [weak self] in self?.objectWillChange.send() }
+                .store(in: &cancellables)
+        }
     }
 
     // MARK: - Derived values

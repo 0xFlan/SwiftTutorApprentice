@@ -19,6 +19,7 @@ struct ContentView: View {
     @StateObject private var model = AppModel()
     @State private var showingLessonEditor = false
     @State private var showingSettings = false
+    @State private var showingWelcome = false
 
     var body: some View {
         NavigationSplitView {
@@ -35,13 +36,18 @@ struct ContentView: View {
                 .navigationSubtitle("Lesson \(model.currentDisplayNumber): \(model.currentLesson.title)")
         }
         .frame(minWidth: 1120, minHeight: 740)
-        // First-run welcome / onboarding.
-        .sheet(isPresented: Binding(
-            get: { !model.settings.hasSeenWelcome },
-            set: { if !$0 { model.settings.hasSeenWelcome = true } }
-        )) {
-            WelcomeView(onStart: { model.settings.hasSeenWelcome = true })
-                .interactiveDismissDisabled()
+        // First-run welcome / onboarding. Driven by ContentView-owned @State
+        // (not a binding into model.settings, which ContentView doesn't observe)
+        // so dismissing it reliably re-renders and closes the sheet.
+        .onAppear {
+            showingWelcome = !model.settings.hasSeenWelcome
+        }
+        .sheet(isPresented: $showingWelcome) {
+            WelcomeView(onStart: {
+                model.settings.hasSeenWelcome = true
+                showingWelcome = false
+            })
+            .interactiveDismissDisabled()
         }
         // The in-app lesson editor: create/edit/reorder/delete lessons.
         .sheet(isPresented: $showingLessonEditor) {
