@@ -239,6 +239,31 @@ final class ProgressStoreMigrationTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: progressURL), originalData)
     }
 
+    func testFutureVersionWithIncompatiblePayloadIsReadOnlyBeforePayloadDecode() throws {
+        try writeJSONObject([
+            "version": 3,
+            "completedLessonIDs": "future-completion-shape",
+            "stageEvents": ["future-event-shape"]
+        ])
+        let originalData = try Data(contentsOf: progressURL)
+        let store = makeStore()
+
+        XCTAssertTrue(store.isReadOnlyForUnsupportedVersion)
+        XCTAssertEqual(store.completedLessonIDs, [])
+        XCTAssertEqual(store.stageEvents, [])
+
+        store.markComplete(41)
+        store.markDeepLessonViewed(41)
+        store.markModifyPassed(41)
+        store.recordRecallAnswer(lessonID: 41, questionID: "future-q", wasCorrect: true)
+        store.reset()
+
+        XCTAssertTrue(store.isReadOnlyForUnsupportedVersion)
+        XCTAssertEqual(store.completedLessonIDs, [])
+        XCTAssertEqual(store.stageEvents, [])
+        XCTAssertEqual(try Data(contentsOf: progressURL), originalData)
+    }
+
     func testDuplicateDecodedEventsKeepFirstLogicalEventAndMetadata() throws {
         let laterDate = fixedDate.addingTimeInterval(60)
         try writeJSONObject([

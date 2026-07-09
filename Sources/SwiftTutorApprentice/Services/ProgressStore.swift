@@ -41,6 +41,9 @@ final class ProgressStore: ObservableObject {
     /// The learning-stage milestones recorded for each lesson.
     @Published private(set) var stageEvents: [LessonStageEvent] = []
 
+    /// True when a newer on-disk schema can only be opened without mutations.
+    @Published private(set) var isReadOnlyForUnsupportedVersion = false
+
     /// On-disk shape of the saved data.
     private struct SavedProgress: Codable {
         var version: Int
@@ -74,6 +77,19 @@ final class ProgressStore: ObservableObject {
         }
     }
 
+    private struct VersionEnvelope: Decodable {
+        let version: Int
+
+        private enum CodingKeys: String, CodingKey {
+            case version
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        }
+    }
+
     private struct LossyStageEvents: Decodable {
         let events: [LessonStageEvent]
 
@@ -100,7 +116,6 @@ final class ProgressStore: ObservableObject {
 
     private let fileURL: URL
     private let now: () -> Date
-    private var isReadOnly = false
 
     convenience init() {
         // Build the path to our Application Support folder + file.
@@ -143,13 +158,17 @@ final class ProgressStore: ObservableObject {
 
     /// Mark a lesson complete (no-op if already complete) and save.
     func markComplete(_ lessonID: Int) {
-        guard !isReadOnly, !completedLessonIDs.contains(lessonID) else { return }
+        guard !isReadOnlyForUnsupportedVersion,
+              !completedLessonIDs.contains(lessonID)
+        else { return }
         completedLessonIDs.insert(lessonID)
         save()
     }
 
     func markDeepLessonViewed(_ lessonID: Int) {
-        guard !isReadOnly, !hasViewedDeepLesson(lessonID) else { return }
+        guard !isReadOnlyForUnsupportedVersion,
+              !hasViewedDeepLesson(lessonID)
+        else { return }
         stageEvents.append(
             LessonStageEvent(
                 lessonID: lessonID,
@@ -163,7 +182,9 @@ final class ProgressStore: ObservableObject {
     }
 
     func markModifyPassed(_ lessonID: Int) {
-        guard !isReadOnly, !hasPassedModify(lessonID) else { return }
+        guard !isReadOnlyForUnsupportedVersion,
+              !hasPassedModify(lessonID)
+        else { return }
         stageEvents.append(
             LessonStageEvent(
                 lessonID: lessonID,
@@ -177,7 +198,7 @@ final class ProgressStore: ObservableObject {
     }
 
     func recordRecallAnswer(lessonID: Int, questionID: String, wasCorrect: Bool) {
-        guard !isReadOnly else { return }
+        guard !isReadOnlyForUnsupportedVersion else { return }
         guard !questionID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }
@@ -203,7 +224,7 @@ final class ProgressStore: ObservableObject {
 
     /// Forget all progress and save.
     func reset() {
-        guard !isReadOnly else { return }
+        guard !isReadOnlyForUnsupportedVersion else { return }
         completedLessonIDs.removeAll()
         stageEvents.removeAll()
         save()
@@ -212,18 +233,25 @@ final class ProgressStore: ObservableObject {
     // MARK: - Persistence
 
     private func load() {
-        guard let data = try? Data(contentsOf: fileURL),
-              let saved = try? JSONDecoder().decode(SavedProgress.self, from: data)
-        else {
+        guard let data = try? Data(contentsOf: fileURL) else {
             return // No file yet (first launch) — start empty.
+        }
+
+        let decoder = JSONDecoder()
+        if let envelope = try? decoder.decode(VersionEnvelope.self, from: data) {
+            isReadOnlyForUnsupportedVersion = !(1...Self.currentVersion)
+                .contains(envelope.version)
+        }
+
+        guard let saved = try? decoder.decode(SavedProgress.self, from: data) else {
+            return
         }
         completedLessonIDs = Set(saved.completedLessonIDs)
         stageEvents = Self.validUniqueEvents(from: saved.stageEvents)
-        isReadOnly = !(1...Self.currentVersion).contains(saved.version)
     }
 
     private func save() {
-        guard !isReadOnly else { return }
+        guard !isReadOnlyForUnsupportedVersion else { return }
         let saved = SavedProgress(
             version: Self.currentVersion,
             completedLessonIDs: completedLessonIDs.sorted(),
