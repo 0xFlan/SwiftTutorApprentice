@@ -69,6 +69,12 @@ highlights and explains each Syntax Lens token, then runs it and explains the
 output. A caption shows the narration text, and the editor is read-only while
 it plays. Stop any time.
 
+**Practice by arranging code (Parsons problems).** On multi-line lessons,
+**Arrange first** opens a practice step: the lesson's code, split into lines and
+scrambled — drag them into the right order and Check, then drop the result into
+the editor. It's a lower-effort bridge between reading code and writing it,
+especially for beginners. (Evidence-based; see `docs/learning-evidence.md`.)
+
 **Author your own lessons — no files, no terminal.** Click **Manage lessons**
 in the sidebar to add, edit, reorder, and delete lessons. Leave the Syntax Lens
 tokens empty and they're generated automatically, or click **Auto-generate**.

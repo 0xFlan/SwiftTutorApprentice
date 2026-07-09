@@ -24,12 +24,22 @@ struct CodeEditorPanel: View {
     /// False while a walkthrough is auto-typing the code.
     var isEditable: Bool = true
 
+    @State private var showingParsons = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Code Editor")
                     .font(.headline)
                 Spacer()
+                if isEditable && ParsonsView.isAvailable(for: placeholder) {
+                    Button {
+                        showingParsons = true
+                    } label: {
+                        Label("Arrange first", systemImage: "arrow.up.arrow.down")
+                    }
+                    .help("Practice: drag the lines into the right order before writing it yourself")
+                }
                 Button {
                     onInsertStarter()
                 } label: {
@@ -68,5 +78,10 @@ struct CodeEditorPanel: View {
                 .foregroundStyle(.secondary)
         }
         .padding(20)
+        .sheet(isPresented: $showingParsons) {
+            ParsonsView(correctCode: placeholder) { arranged in
+                code = arranged
+            }
+        }
     }
 }
