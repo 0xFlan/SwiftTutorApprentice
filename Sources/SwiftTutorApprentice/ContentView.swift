@@ -35,7 +35,7 @@ struct ContentView: View {
                 .navigationTitle("SwiftTutor Apprentice")
                 .navigationSubtitle("Lesson \(model.currentDisplayNumber): \(model.currentLesson.title)")
         }
-        .frame(minWidth: 1120, minHeight: 740)
+        .frame(minWidth: 680, minHeight: 520)
         // First-run welcome / onboarding. Driven by ContentView-owned @State
         // (not a binding into model.settings, which ContentView doesn't observe)
         // so dismissing it reliably re-renders and closes the sheet.
