@@ -79,6 +79,50 @@ final class ModifyTaskEvaluatorTests: XCTestCase {
         )
     }
 
+    func testCodeComparisonRemovesEveryTrailingSwiftNewlineCharacter() {
+        let trailingNewlines = [
+            (name: "vertical tab", character: "\u{000B}"),
+            (name: "form feed", character: "\u{000C}"),
+            (name: "next line", character: "\u{0085}"),
+            (name: "line separator", character: "\u{2028}"),
+            (name: "paragraph separator", character: "\u{2029}")
+        ]
+
+        for trailingNewline in trailingNewlines {
+            XCTAssertEqual(
+                ModifyTaskEvaluator.evaluate(
+                    code: task.expectedCode + trailingNewline.character,
+                    prediction: task.expectedOutput,
+                    task: task
+                ),
+                .passed,
+                trailingNewline.name
+            )
+        }
+    }
+
+    func testCodeComparisonKeepsLeadingNewlineSignificant() {
+        XCTAssertEqual(
+            ModifyTaskEvaluator.evaluate(
+                code: "\u{2028}" + task.expectedCode,
+                prediction: task.expectedOutput,
+                task: task
+            ),
+            .codeDoesNotMatch
+        )
+    }
+
+    func testCodeComparisonKeepsTrailingOrdinarySpaceSignificant() {
+        XCTAssertEqual(
+            ModifyTaskEvaluator.evaluate(
+                code: task.expectedCode + " ",
+                prediction: task.expectedOutput,
+                task: task
+            ),
+            .codeDoesNotMatch
+        )
+    }
+
     func testPredictionComparisonTrimsSurroundingWhitespaceAndNewlines() {
         XCTAssertEqual(
             ModifyTaskEvaluator.evaluate(

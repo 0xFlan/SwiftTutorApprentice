@@ -34,7 +34,7 @@ enum ModifyTaskEvaluator {
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
 
-        while normalized.last == "\n" {
+        while normalized.last?.isNewline == true {
             normalized.removeLast()
         }
 
