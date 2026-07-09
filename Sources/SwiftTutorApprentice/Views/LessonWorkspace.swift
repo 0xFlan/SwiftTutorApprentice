@@ -102,7 +102,8 @@ struct LessonWorkspace: View {
             code: $model.code,
             placeholder: model.currentLesson.starterCode,
             onInsertStarter: model.insertStarter,
-            isEditable: !model.isPlayingWalkthrough
+            isEditable: !model.isPlayingWalkthrough,
+            practiceEnabled: !model.currentLessonIsConcept
         )
     }
 

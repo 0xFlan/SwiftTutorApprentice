@@ -75,6 +75,13 @@ scrambled — drag them into the right order and Check, then drop the result int
 the editor. It's a lower-effort bridge between reading code and writing it,
 especially for beginners. (Evidence-based; see `docs/learning-evidence.md`.)
 
+**Find the bug (self-explanation).** On code lessons, **Find the bug** shows the
+lesson's code with one common beginner mistake injected. You explain — in your
+own words — what's wrong and how to fix it, then reveal the answer, or load the
+broken code into the editor to fix and Run it for the real Swift error.
+Explaining a broken example is one of the best-supported ways to build
+understanding. (See `docs/learning-evidence.md`.)
+
 **Author your own lessons — no files, no terminal.** Click **Manage lessons**
 in the sidebar to add, edit, reorder, and delete lessons. Leave the Syntax Lens
 tokens empty and they're generated automatically, or click **Auto-generate**.

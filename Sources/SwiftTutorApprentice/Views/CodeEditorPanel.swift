@@ -24,7 +24,13 @@ struct CodeEditorPanel: View {
     /// False while a walkthrough is auto-typing the code.
     var isEditable: Bool = true
 
+    /// Whether practice modes (Arrange / Find the bug) apply — code lessons only.
+    var practiceEnabled: Bool = true
+
     @State private var showingParsons = false
+    @State private var showingBugHunt = false
+
+    private var practiceAvailable: Bool { isEditable && practiceEnabled }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -32,13 +38,21 @@ struct CodeEditorPanel: View {
                 Text("Code Editor")
                     .font(.headline)
                 Spacer()
-                if isEditable && ParsonsView.isAvailable(for: placeholder) {
+                if practiceAvailable && ParsonsView.isAvailable(for: placeholder) {
                     Button {
                         showingParsons = true
                     } label: {
                         Label("Arrange first", systemImage: "arrow.up.arrow.down")
                     }
                     .help("Practice: drag the lines into the right order before writing it yourself")
+                }
+                if practiceAvailable && BugInjector.canInject(placeholder) {
+                    Button {
+                        showingBugHunt = true
+                    } label: {
+                        Label("Find the bug", systemImage: "ladybug")
+                    }
+                    .help("Practice: spot and explain a bug in this lesson's code")
                 }
                 Button {
                     onInsertStarter()
@@ -81,6 +95,11 @@ struct CodeEditorPanel: View {
         .sheet(isPresented: $showingParsons) {
             ParsonsView(correctCode: placeholder) { arranged in
                 code = arranged
+            }
+        }
+        .sheet(isPresented: $showingBugHunt) {
+            BugHuntView(correctCode: placeholder) { buggy in
+                code = buggy
             }
         }
     }
