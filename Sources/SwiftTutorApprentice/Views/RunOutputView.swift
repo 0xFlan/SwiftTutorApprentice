@@ -18,61 +18,64 @@ struct RunOutputView: View {
     let onRun: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        GeometryReader { geo in
+            let narrow = geo.size.width < 560
+            VStack(alignment: .leading, spacing: 12) {
 
-            // --- Prediction + Run controls ---
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("What do you think this will output?")
-                        .font(.subheadline.bold())
-                    TextField("Your prediction…", text: $prediction)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.body, design: .monospaced))
-                        .disableAutocorrection(true)
+                // --- Prediction + Run controls ---
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("What do you think this will output?")
+                            .font(.subheadline.bold())
+                        TextField("Your prediction…", text: $prediction)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(.body, design: .monospaced))
+                            .disableAutocorrection(true)
+                    }
+
+                    VStack(spacing: 6) {
+                        Button(action: onRun) {
+                            HStack(spacing: 6) {
+                                if isRunning {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Image(systemName: "play.fill")
+                                }
+                                Text(isRunning ? "Running…" : "Run")
+                            }
+                            .frame(minWidth: 90)
+                        }
+                        .keyboardShortcut("r", modifiers: .command)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isRunning)
+
+                        Text("⌘R")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
-                VStack(spacing: 6) {
-                    Button(action: onRun) {
-                        HStack(spacing: 6) {
-                            if isRunning {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Image(systemName: "play.fill")
-                            }
-                            Text(isRunning ? "Running…" : "Run")
-                        }
-                        .frame(minWidth: 90)
-                    }
-                    .keyboardShortcut("r", modifiers: .command)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isRunning)
+                Divider()
 
-                    Text("⌘R")
-                        .font(.caption2)
+                // --- Output area ---
+                if let result = runResult {
+                    resultsView(result, narrow: narrow)
+                } else {
+                    Text("Run your code to see stdout, stderr, and the exit code here.")
+                        .font(.callout)
                         .foregroundStyle(.secondary)
                 }
             }
-
-            Divider()
-
-            // --- Output area ---
-            if let result = runResult {
-                resultsView(result)
-            } else {
-                Text("Run your code to see stdout, stderr, and the exit code here.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Results
 
     @ViewBuilder
-    private func resultsView(_ result: RunResult) -> some View {
+    private func resultsView(_ result: RunResult, narrow: Bool) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
 
@@ -84,31 +87,23 @@ struct RunOutputView: View {
                         tint: .red,
                         text: launchError
                     )
+                } else if narrow {
+                    // Narrow window: stack the three streams vertically.
+                    VStack(alignment: .leading, spacing: 12) {
+                        outputColumn(title: "stdout (standard output)",
+                                     text: result.stdout.isEmpty ? "(empty)" : result.stdout, tint: .green)
+                        outputColumn(title: "stderr (standard error)",
+                                     text: result.stderr.isEmpty ? "(empty)" : result.stderr, tint: .orange)
+                        exitCodeBlock(result)
+                    }
                 } else {
-                    // Three streams the learner should understand.
+                    // Wide window: three streams side by side.
                     HStack(alignment: .top, spacing: 16) {
-                        outputColumn(
-                            title: "stdout (standard output)",
-                            text: result.stdout.isEmpty ? "(empty)" : result.stdout,
-                            tint: .green
-                        )
-                        outputColumn(
-                            title: "stderr (standard error)",
-                            text: result.stderr.isEmpty ? "(empty)" : result.stderr,
-                            tint: .orange
-                        )
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("exit code")
-                                .font(.caption.bold())
-                                .foregroundStyle(.secondary)
-                            Text("\(result.exitCode)")
-                                .font(.system(.title2, design: .monospaced).bold())
-                                .foregroundStyle(result.exitCode == 0 ? .green : .red)
-                            Text(result.exitCode == 0 ? "success" : "non-zero = problem")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(minWidth: 90, alignment: .leading)
+                        outputColumn(title: "stdout (standard output)",
+                                     text: result.stdout.isEmpty ? "(empty)" : result.stdout, tint: .green)
+                        outputColumn(title: "stderr (standard error)",
+                                     text: result.stderr.isEmpty ? "(empty)" : result.stderr, tint: .orange)
+                        exitCodeBlock(result)
                     }
                 }
 
@@ -131,6 +126,21 @@ struct RunOutputView: View {
                 )
             }
         }
+    }
+
+    private func exitCodeBlock(_ result: RunResult) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("exit code")
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+            Text("\(result.exitCode)")
+                .font(.system(.title2, design: .monospaced).bold())
+                .foregroundStyle(result.exitCode == 0 ? .green : .red)
+            Text(result.exitCode == 0 ? "success" : "non-zero = problem")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(minWidth: 90, alignment: .leading)
     }
 
     private func outputColumn(title: String, text: String, tint: Color) -> some View {
