@@ -33,6 +33,8 @@ struct LessonStageEvent: Codable, Hashable {
 
 final class ProgressStore: ObservableObject {
 
+    private static let currentVersion = 2
+
     /// The set of lesson ids the learner has completed.
     @Published private(set) var completedLessonIDs: Set<Int> = []
 
@@ -65,15 +67,40 @@ final class ProgressStore: ObservableObject {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
             completedLessonIDs = try container.decode([Int].self, forKey: .completedLessonIDs)
-            stageEvents = try container.decodeIfPresent(
-                [LessonStageEvent].self,
+            stageEvents = (try? container.decode(
+                LossyStageEvents.self,
                 forKey: .stageEvents
-            ) ?? []
+            ))?.events ?? []
         }
+    }
+
+    private struct LossyStageEvents: Decodable {
+        let events: [LessonStageEvent]
+
+        init(from decoder: Decoder) throws {
+            var container = try decoder.unkeyedContainer()
+            var decodedEvents: [LessonStageEvent] = []
+
+            while !container.isAtEnd {
+                let eventDecoder = try container.superDecoder()
+                if let event = try? LessonStageEvent(from: eventDecoder) {
+                    decodedEvents.append(event)
+                }
+            }
+
+            events = decodedEvents
+        }
+    }
+
+    private struct StageEventKey: Hashable {
+        let lessonID: Int
+        let kind: LessonStageEventKind
+        let questionID: String?
     }
 
     private let fileURL: URL
     private let now: () -> Date
+    private var isReadOnly = false
 
     convenience init() {
         // Build the path to our Application Support folder + file.
@@ -116,13 +143,13 @@ final class ProgressStore: ObservableObject {
 
     /// Mark a lesson complete (no-op if already complete) and save.
     func markComplete(_ lessonID: Int) {
-        guard !completedLessonIDs.contains(lessonID) else { return }
+        guard !isReadOnly, !completedLessonIDs.contains(lessonID) else { return }
         completedLessonIDs.insert(lessonID)
         save()
     }
 
     func markDeepLessonViewed(_ lessonID: Int) {
-        guard !hasViewedDeepLesson(lessonID) else { return }
+        guard !isReadOnly, !hasViewedDeepLesson(lessonID) else { return }
         stageEvents.append(
             LessonStageEvent(
                 lessonID: lessonID,
@@ -136,7 +163,7 @@ final class ProgressStore: ObservableObject {
     }
 
     func markModifyPassed(_ lessonID: Int) {
-        guard !hasPassedModify(lessonID) else { return }
+        guard !isReadOnly, !hasPassedModify(lessonID) else { return }
         stageEvents.append(
             LessonStageEvent(
                 lessonID: lessonID,
@@ -150,6 +177,7 @@ final class ProgressStore: ObservableObject {
     }
 
     func recordRecallAnswer(lessonID: Int, questionID: String, wasCorrect: Bool) {
+        guard !isReadOnly else { return }
         guard !questionID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }
@@ -175,6 +203,7 @@ final class ProgressStore: ObservableObject {
 
     /// Forget all progress and save.
     func reset() {
+        guard !isReadOnly else { return }
         completedLessonIDs.removeAll()
         stageEvents.removeAll()
         save()
@@ -189,12 +218,14 @@ final class ProgressStore: ObservableObject {
             return // No file yet (first launch) — start empty.
         }
         completedLessonIDs = Set(saved.completedLessonIDs)
-        stageEvents = saved.stageEvents.filter(Self.hasValidMetadata)
+        stageEvents = Self.validUniqueEvents(from: saved.stageEvents)
+        isReadOnly = !(1...Self.currentVersion).contains(saved.version)
     }
 
     private func save() {
+        guard !isReadOnly else { return }
         let saved = SavedProgress(
-            version: 2,
+            version: Self.currentVersion,
             completedLessonIDs: completedLessonIDs.sorted(),
             stageEvents: stageEvents
         )
@@ -223,5 +254,24 @@ final class ProgressStore: ObservableObject {
         case .deepLessonViewed, .modifyPassed:
             return event.questionID == nil && event.wasCorrect == nil
         }
+    }
+
+    private static func validUniqueEvents(
+        from events: [LessonStageEvent]
+    ) -> [LessonStageEvent] {
+        var seenKeys: Set<StageEventKey> = []
+        var uniqueEvents: [LessonStageEvent] = []
+
+        for event in events where hasValidMetadata(event) {
+            let key = StageEventKey(
+                lessonID: event.lessonID,
+                kind: event.kind,
+                questionID: event.kind == .recallAnswered ? event.questionID : nil
+            )
+            guard seenKeys.insert(key).inserted else { continue }
+            uniqueEvents.append(event)
+        }
+
+        return uniqueEvents
     }
 }

@@ -177,6 +177,158 @@ final class ProgressStoreMigrationTests: XCTestCase {
         )
     }
 
+    func testMixedVersionTwoEventsDropOnlyUnknownAndMalformedElements() throws {
+        let validEvent = eventJSONObject(lessonID: 14, kind: "deepLessonViewed")
+        var malformedEvent = eventJSONObject(lessonID: 14, kind: "modifyPassed")
+        malformedEvent.removeValue(forKey: "timestamp")
+        try writeJSONObject([
+            "version": 2,
+            "completedLessonIDs": [1, 3],
+            "stageEvents": [
+                validEvent,
+                eventJSONObject(lessonID: 14, kind: "futureStageKind"),
+                malformedEvent,
+                [
+                    "lessonID": "not-an-integer",
+                    "kind": "modifyPassed",
+                    "timestamp": fixedDate.timeIntervalSinceReferenceDate
+                ]
+            ]
+        ])
+
+        let store = makeStore()
+
+        XCTAssertEqual(store.completedLessonIDs, [1, 3])
+        XCTAssertEqual(
+            store.stageEvents,
+            [
+                LessonStageEvent(
+                    lessonID: 14,
+                    kind: .deepLessonViewed,
+                    timestamp: fixedDate,
+                    questionID: nil,
+                    wasCorrect: nil
+                )
+            ]
+        )
+    }
+
+    func testFutureVersionLoadsReadOnlyAndEveryMutationLeavesStateAndBytesUnchanged() throws {
+        try writeJSONObject([
+            "version": 3,
+            "completedLessonIDs": [21, 23],
+            "stageEvents": [
+                eventJSONObject(lessonID: 21, kind: "deepLessonViewed")
+            ]
+        ])
+        let originalData = try Data(contentsOf: progressURL)
+        let store = makeStore()
+        let originalCompletedLessonIDs = store.completedLessonIDs
+        let originalStageEvents = store.stageEvents
+
+        store.markComplete(25)
+        store.markDeepLessonViewed(23)
+        store.markModifyPassed(21)
+        store.recordRecallAnswer(lessonID: 21, questionID: "future-q", wasCorrect: true)
+        store.reset()
+
+        XCTAssertEqual(originalCompletedLessonIDs, [21, 23])
+        XCTAssertEqual(originalStageEvents.count, 1)
+        XCTAssertEqual(store.completedLessonIDs, originalCompletedLessonIDs)
+        XCTAssertEqual(store.stageEvents, originalStageEvents)
+        XCTAssertEqual(try Data(contentsOf: progressURL), originalData)
+    }
+
+    func testDuplicateDecodedEventsKeepFirstLogicalEventAndMetadata() throws {
+        let laterDate = fixedDate.addingTimeInterval(60)
+        try writeJSONObject([
+            "version": 2,
+            "completedLessonIDs": [],
+            "stageEvents": [
+                eventJSONObject(lessonID: 31, kind: "deepLessonViewed"),
+                eventJSONObject(
+                    lessonID: 31,
+                    kind: "deepLessonViewed",
+                    timestamp: laterDate
+                ),
+                eventJSONObject(lessonID: 31, kind: "modifyPassed"),
+                eventJSONObject(
+                    lessonID: 31,
+                    kind: "modifyPassed",
+                    timestamp: laterDate
+                ),
+                eventJSONObject(
+                    lessonID: 31,
+                    kind: "recallAnswered",
+                    questionID: "q-1",
+                    wasCorrect: false
+                ),
+                eventJSONObject(
+                    lessonID: 31,
+                    kind: "recallAnswered",
+                    timestamp: laterDate,
+                    questionID: "q-1",
+                    wasCorrect: true
+                ),
+                eventJSONObject(
+                    lessonID: 31,
+                    kind: "recallAnswered",
+                    timestamp: laterDate,
+                    questionID: "q-2",
+                    wasCorrect: true
+                ),
+                eventJSONObject(
+                    lessonID: 32,
+                    kind: "deepLessonViewed",
+                    timestamp: laterDate
+                )
+            ]
+        ])
+
+        let store = makeStore()
+
+        XCTAssertEqual(
+            store.stageEvents,
+            [
+                LessonStageEvent(
+                    lessonID: 31,
+                    kind: .deepLessonViewed,
+                    timestamp: fixedDate,
+                    questionID: nil,
+                    wasCorrect: nil
+                ),
+                LessonStageEvent(
+                    lessonID: 31,
+                    kind: .modifyPassed,
+                    timestamp: fixedDate,
+                    questionID: nil,
+                    wasCorrect: nil
+                ),
+                LessonStageEvent(
+                    lessonID: 31,
+                    kind: .recallAnswered,
+                    timestamp: fixedDate,
+                    questionID: "q-1",
+                    wasCorrect: false
+                ),
+                LessonStageEvent(
+                    lessonID: 31,
+                    kind: .recallAnswered,
+                    timestamp: laterDate,
+                    questionID: "q-2",
+                    wasCorrect: true
+                ),
+                LessonStageEvent(
+                    lessonID: 32,
+                    kind: .deepLessonViewed,
+                    timestamp: laterDate,
+                    questionID: nil,
+                    wasCorrect: nil
+                )
+            ]
+        )
+    }
+
     func testVersionTwoReloadPreservesEveryEventField() {
         let store = makeStore()
         store.markComplete(9)
@@ -254,13 +406,14 @@ final class ProgressStoreMigrationTests: XCTestCase {
     private func eventJSONObject(
         lessonID: Int,
         kind: String,
+        timestamp: Date? = nil,
         questionID: String? = nil,
         wasCorrect: Bool? = nil
     ) -> [String: Any] {
         var event: [String: Any] = [
             "lessonID": lessonID,
             "kind": kind,
-            "timestamp": fixedDate.timeIntervalSinceReferenceDate
+            "timestamp": (timestamp ?? fixedDate).timeIntervalSinceReferenceDate
         ]
         if let questionID {
             event["questionID"] = questionID
