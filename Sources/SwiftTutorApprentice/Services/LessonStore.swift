@@ -22,12 +22,22 @@ final class LessonStore: ObservableObject {
     @Published private(set) var lessons: [Lesson] = []
 
     private let fileURL: URL
+    private let defaults: [Lesson]
 
-    init() {
+    private static var defaultFileURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser
         let folder = base.appendingPathComponent("SwiftTutorApprentice", isDirectory: true)
-        self.fileURL = folder.appendingPathComponent("lessons.json", isDirectory: false)
+        return folder.appendingPathComponent("lessons.json", isDirectory: false)
+    }
+
+    convenience init() {
+        self.init(fileURL: Self.defaultFileURL, defaults: Curriculum.defaultLessons)
+    }
+
+    init(fileURL: URL, defaults: [Lesson]) {
+        self.fileURL = fileURL
+        self.defaults = defaults
 
         load()
     }
@@ -76,7 +86,7 @@ final class LessonStore: ObservableObject {
 
     /// Throw away all changes and reload the built-in default curriculum.
     func restoreDefaults() {
-        lessons = Curriculum.defaultLessons
+        lessons = defaults
         save()
     }
 
@@ -88,27 +98,47 @@ final class LessonStore: ObservableObject {
               !decoded.isEmpty
         else {
             // No usable file yet — seed from the built-in curriculum.
-            lessons = Curriculum.defaultLessons
+            lessons = defaults
             save()
             return
         }
         lessons = decoded
-        mergeMissingDefaults()
+        mergeDefaults()
     }
 
-    /// Append any built-in lessons the saved file doesn't have yet (matched by
-    /// id). This lets a returning learner pick up newly added curriculum
-    /// lessons without losing edits they've made to existing ones.
+    /// Enrich compatible built-in lessons with newly bundled deep content, then
+    /// append any built-in lessons the saved file doesn't have yet. Compatibility
+    /// requires the stable id, lesson kind, and starter code to still match so a
+    /// learner's customized exercise is never replaced with stock content.
     ///
     /// Trade-off: a built-in lesson the learner deleted will reappear on the
     /// next launch. That's an acceptable choice for a curriculum app — use the
     /// editor to remove it again if needed.
-    private func mergeMissingDefaults() {
-        let existingIDs = Set(lessons.map(\.id))
-        let missing = Curriculum.defaultLessons.filter { !existingIDs.contains($0.id) }
-        guard !missing.isEmpty else { return }
-        lessons.append(contentsOf: missing)
-        save()
+    private func mergeDefaults() {
+        var changed = false
+
+        for index in lessons.indices {
+            let savedLesson = lessons[index]
+            guard let defaultLesson = defaults.first(where: { $0.id == savedLesson.id }),
+                  defaultLesson.kind == savedLesson.kind,
+                  defaultLesson.starterCode == savedLesson.starterCode,
+                  savedLesson.deepContent == nil,
+                  let deepContent = defaultLesson.deepContent
+            else { continue }
+
+            lessons[index].deepContent = deepContent
+            changed = true
+        }
+
+        var existingIDs = Set(lessons.map(\.id))
+        for defaultLesson in defaults where existingIDs.insert(defaultLesson.id).inserted {
+            lessons.append(defaultLesson)
+            changed = true
+        }
+
+        if changed {
+            save()
+        }
     }
 
     private func save() {
