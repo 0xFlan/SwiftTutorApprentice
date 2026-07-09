@@ -34,6 +34,11 @@ struct LessonWorkspace: View {
             navigationBar
             Divider()
 
+            if model.isPlayingWalkthrough {
+                walkthroughBanner
+                Divider()
+            }
+
             // The three panels: side-by-side when there's room, otherwise a
             // segmented picker showing one full-width panel at a time. This
             // keeps every panel readable instead of compressing on small windows.
@@ -85,14 +90,19 @@ struct LessonWorkspace: View {
     // The three panels, extracted so both layouts reuse them.
 
     private var lessonPanel: some View {
-        LessonPanel(lesson: model.currentLesson, number: model.currentDisplayNumber)
+        LessonPanel(
+            lesson: model.currentLesson,
+            number: model.currentDisplayNumber,
+            activeTokenID: model.activeTokenID
+        )
     }
 
     private var codePanel: some View {
         CodeEditorPanel(
             code: $model.code,
             placeholder: model.currentLesson.starterCode,
-            onInsertStarter: model.insertStarter
+            onInsertStarter: model.insertStarter,
+            isEditable: !model.isPlayingWalkthrough
         )
     }
 
@@ -144,6 +154,25 @@ struct LessonWorkspace: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var walkthroughBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "speaker.wave.2.fill")
+                .foregroundStyle(Color.accentColor)
+            Text(model.walkthroughCaption)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                model.stopWalkthrough()
+            } label: {
+                Label("Stop", systemImage: "stop.fill")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.accentColor.opacity(0.10))
+    }
+
     private var navigationBar: some View {
         HStack(spacing: 10) {
             Button {
@@ -161,6 +190,18 @@ struct LessonWorkspace: View {
             }
             .disabled(!model.hasNextLesson)
             .keyboardShortcut("]", modifiers: .command)
+
+            Button {
+                if model.isPlayingWalkthrough {
+                    model.stopWalkthrough()
+                } else {
+                    model.startWalkthrough()
+                }
+            } label: {
+                Label(model.isPlayingWalkthrough ? "Stop" : "Walkthrough",
+                      systemImage: model.isPlayingWalkthrough ? "stop.fill" : "play.circle")
+            }
+            .help("Play a narrated walkthrough: the code types itself in and each part is explained aloud")
 
             Spacer()
 

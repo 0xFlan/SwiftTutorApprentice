@@ -21,6 +21,9 @@ struct CodeEditorPanel: View {
     /// Reset the editor back to the lesson's starter line.
     let onInsertStarter: () -> Void
 
+    /// False while a walkthrough is auto-typing the code.
+    var isEditable: Bool = true
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -33,13 +36,14 @@ struct CodeEditorPanel: View {
                     Label("Insert starter", systemImage: "text.insert")
                 }
                 .help("Fill the editor with this lesson's starter code")
+                .disabled(!isEditable)
             }
 
             Text("Type Swift here. This is the file that gets run.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            CodeTextView(text: $code)
+            CodeTextView(text: $code, isEditable: isEditable)
                 .frame(minHeight: 160)
                 .background(Color(nsColor: .textBackgroundColor))
                 .clipShape(RoundedRectangle(cornerRadius: 8))

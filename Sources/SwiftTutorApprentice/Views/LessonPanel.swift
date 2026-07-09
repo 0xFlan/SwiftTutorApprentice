@@ -15,6 +15,8 @@ struct LessonPanel: View {
     let lesson: Lesson
     /// 1-based position in the curriculum (for the "Lesson N" label).
     let number: Int
+    /// Token highlighted by an active walkthrough (nil when idle).
+    var activeTokenID: Int? = nil
 
     var body: some View {
         ScrollView {
@@ -85,7 +87,8 @@ struct LessonPanel: View {
                         : lesson.syntaxTokens,
                     whyExplanation: lesson.syntaxWhy.isEmpty
                         ? SyntaxTokenizer.autoWhy
-                        : lesson.syntaxWhy
+                        : lesson.syntaxWhy,
+                    activeTokenID: activeTokenID
                 )
 
                 Spacer(minLength: 0)

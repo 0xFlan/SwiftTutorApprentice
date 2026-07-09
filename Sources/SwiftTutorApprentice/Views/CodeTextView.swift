@@ -18,6 +18,9 @@ import AppKit
 
 struct CodeTextView: NSViewRepresentable {
     @Binding var text: String
+    /// When false, the user can't type (used during a walkthrough while the
+    /// code is auto-typing itself in).
+    var isEditable: Bool = true
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -26,6 +29,7 @@ struct CodeTextView: NSViewRepresentable {
         textView.delegate = context.coordinator
         textView.isRichText = false
         textView.allowsUndo = true
+        textView.isEditable = isEditable
         textView.font = Self.baseFont
         textView.backgroundColor = .textBackgroundColor
         textView.textContainerInset = NSSize(width: 6, height: 8)
@@ -59,9 +63,11 @@ struct CodeTextView: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         guard let textView = nsView.documentView as? NSTextView else { return }
+        textView.isEditable = isEditable
         // Only overwrite when the text changed from OUTSIDE (lesson switch,
-        // Insert starter, clear). While the user types, text already matches,
-        // so we don't touch the string — preserving the cursor position.
+        // Insert starter, clear, or walkthrough typing). While the user types,
+        // text already matches, so we don't touch the string — preserving the
+        // cursor position.
         if textView.string != text {
             textView.string = text
             context.coordinator.applyHighlighting()

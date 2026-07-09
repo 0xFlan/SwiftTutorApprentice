@@ -48,6 +48,17 @@ final class AppModel: ObservableObject {
     @Published var aiError: String?
     @Published var isAskingAI = false
 
+    // MARK: - Walkthrough (narrated "watch it type itself" playback)
+
+    @Published var isPlayingWalkthrough = false
+    /// The line currently being narrated (shown as an on-screen caption).
+    @Published var walkthroughCaption = ""
+    /// The Syntax Lens token currently being explained (for highlighting).
+    @Published var activeTokenID: Int?
+
+    private let speaker = NarrationSpeaker()
+    private var walkthroughTask: Task<Void, Never>?
+
     // Keeps the forwarding subscriptions alive.
     private var cancellables = Set<AnyCancellable>()
 
@@ -116,6 +127,7 @@ final class AppModel: ObservableObject {
     /// Switch lessons and give the learner a clean slate.
     func selectLesson(_ id: Int) {
         guard id != selectedLessonID else { return }
+        if isPlayingWalkthrough { stopWalkthrough() }
         selectedLessonID = id
         code = ""
         prediction = ""
@@ -155,6 +167,110 @@ final class AppModel: ObservableObject {
     /// Mark the current lesson complete (used by read-only concept lessons).
     func markCurrentLessonRead() {
         progress.markComplete(selectedLessonID)
+    }
+
+    // MARK: - Walkthrough
+
+    /// Play a narrated walkthrough of the current lesson: the code types
+    /// itself in, each Syntax Lens token is highlighted and explained aloud,
+    /// and (for code lessons) the program is run and its output explained.
+    func startWalkthrough() {
+        guard !isPlayingWalkthrough else { return }
+        isPlayingWalkthrough = true
+        activeTokenID = nil
+        let lesson = currentLesson
+        let number = currentDisplayNumber
+        walkthroughTask = Task {
+            await self.runWalkthrough(lesson, number: number)
+            self.endWalkthrough()
+        }
+    }
+
+    /// Stop a walkthrough in progress.
+    func stopWalkthrough() {
+        guard isPlayingWalkthrough else { return }
+        walkthroughTask?.cancel()
+        speaker.stop()
+        endWalkthrough()
+    }
+
+    private func endWalkthrough() {
+        walkthroughTask = nil
+        isPlayingWalkthrough = false
+        walkthroughCaption = ""
+        activeTokenID = nil
+    }
+
+    private func runWalkthrough(_ lesson: Lesson, number: Int) async {
+        // Narrate one line: show it as a caption, then speak it.
+        func step(_ text: String) async {
+            guard !Task.isCancelled else { return }
+            walkthroughCaption = text
+            await speaker.speak(text)
+        }
+
+        code = ""
+        runResult = nil
+
+        await step("Lesson \(number): \(lesson.title). \(lesson.goal)")
+        guard !Task.isCancelled else { return }
+
+        await step("Here's the code for this lesson. Watch as it's typed in.")
+        walkthroughCaption = "Typing the code…"
+        await typeCode(lesson.starterCode)
+        guard !Task.isCancelled else { return }
+
+        let tokens = lesson.syntaxTokens.isEmpty
+            ? SyntaxTokenizer.tokenize(lesson.starterCode)
+            : lesson.syntaxTokens
+        if !tokens.isEmpty {
+            await step("Now let's break it down, piece by piece.")
+            for token in tokens {
+                guard !Task.isCancelled else { return }
+                activeTokenID = token.id
+                await step(token.explanation)
+            }
+            activeTokenID = nil
+        }
+
+        if !lesson.syntaxWhy.isEmpty {
+            await step(lesson.syntaxWhy)
+        }
+        guard !Task.isCancelled else { return }
+
+        if lesson.kind == .concept {
+            if !lesson.successMessage.isEmpty {
+                await step(lesson.successMessage)
+            }
+        } else if !lesson.expectedOutput.isEmpty {
+            await step("Before running it, try to predict what this will print.")
+            guard !Task.isCancelled else { return }
+            walkthroughCaption = "Running the code…"
+            isRunning = true
+            let result = await runner.run(code: code)
+            isRunning = false
+            runResult = result
+            guard !Task.isCancelled else { return }
+            if result.succeeded {
+                let out = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+                await step("It ran successfully. The output was: \(out). The program finished with exit code zero, which means success.")
+            } else {
+                await step("The program didn't run cleanly. Read the standard error output to see what needs fixing.")
+            }
+        }
+        guard !Task.isCancelled else { return }
+
+        await step("That's the lesson. Now try typing it yourself and pressing Run.")
+    }
+
+    /// Animate the code appearing character by character, like a screencast.
+    private func typeCode(_ target: String) async {
+        code = ""
+        for character in target {
+            guard !Task.isCancelled else { return }
+            code.append(character)
+            try? await Task.sleep(nanoseconds: 22_000_000) // ~22ms per character
+        }
     }
 
     /// Ask the optional AI coach about the current code. No-op if AI is off.

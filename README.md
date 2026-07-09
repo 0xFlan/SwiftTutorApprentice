@@ -62,6 +62,13 @@ running.
 6. A clean run that matches the lesson's expected output marks it complete
    (green check). Move between lessons with **⌘[** / **⌘]**.
 
+**Watch a narrated walkthrough.** Click **Walkthrough** to have the app type
+the code in for you and narrate each step aloud (built-in macOS speech, fully
+offline): it introduces the lesson, types the code character by character,
+highlights and explains each Syntax Lens token, then runs it and explains the
+output. A caption shows the narration text, and the editor is read-only while
+it plays. Stop any time.
+
 **Author your own lessons — no files, no terminal.** Click **Manage lessons**
 in the sidebar to add, edit, reorder, and delete lessons. Leave the Syntax Lens
 tokens empty and they're generated automatically, or click **Auto-generate**.

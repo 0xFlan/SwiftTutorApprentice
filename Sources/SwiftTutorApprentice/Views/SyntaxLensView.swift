@@ -11,6 +11,8 @@ import SwiftUI
 struct SyntaxLensView: View {
     let tokens: [SyntaxToken]
     let whyExplanation: String
+    /// The token currently highlighted by a walkthrough (nil when idle).
+    var activeTokenID: Int? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -24,7 +26,7 @@ struct SyntaxLensView: View {
             // Lay the token chips out in rows that wrap.
             FlowLayout(spacing: 6) {
                 ForEach(tokens) { token in
-                    SyntaxTokenChip(token: token)
+                    SyntaxTokenChip(token: token, isActive: token.id == activeTokenID)
                 }
             }
 
@@ -41,9 +43,11 @@ struct SyntaxLensView: View {
     }
 }
 
-/// One clickable token chip with a popover explanation.
+/// One clickable token chip with a popover explanation. When `isActive`
+/// (during a walkthrough) it highlights so the learner can follow along.
 private struct SyntaxTokenChip: View {
     let token: SyntaxToken
+    var isActive: Bool = false
     @State private var showing = false
 
     var body: some View {
@@ -54,11 +58,16 @@ private struct SyntaxTokenChip: View {
                 .font(.system(.body, design: .monospaced))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
-                .background(Color.secondary.opacity(0.12))
+                .background(isActive ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.accentColor, lineWidth: isActive ? 1.5 : 0)
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
         .help(token.explanation)
+        .animation(.easeInOut(duration: 0.2), value: isActive)
         .popover(isPresented: $showing, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(token.display)
