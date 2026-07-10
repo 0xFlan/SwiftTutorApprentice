@@ -27,6 +27,7 @@ final class LessonStore: ObservableObject {
 
     private let fileURL: URL
     private let defaults: [Lesson]
+    // Advance with supported bundled revisions; structural fields require a schemaVersion bump.
     private static let baselineSupportedBundledRevision = 1
 
     private static var defaultFileURL: URL {

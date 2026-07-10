@@ -289,7 +289,7 @@ struct LessonWorkspace: View {
                     .font(.callout.bold())
                     .foregroundStyle(.primary)
 
-                Text("This lesson file contains newer or unsupported Deep Lesson data. Base lesson content can still be viewed and practiced, but the unsupported Deep Lesson enrichment is unavailable. Automatic enrichment and lesson editing are disabled to preserve the file's bytes.")
+                Text("This lesson file contains newer or unsupported Deep Lesson data. Some newer enrichment may remain viewable, but automatic enrichment and lesson editing are disabled to preserve the file's exact data. Base lessons remain available.")
                     .font(.caption)
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
