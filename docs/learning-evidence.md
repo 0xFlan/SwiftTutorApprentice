@@ -40,10 +40,10 @@ This file grounds the app's pedagogy in evidence and sequences the roadmap.
 4. **Cognitive Load Theory** — keep intrinsic load appropriate, minimise
    extraneous load; unfamiliar terminology itself raises load for novices.
    *Source: PMC12246501.*
-   - **App fit:** the inline tap-to-define glossary is implemented. Automatic
-     term linking and prerequisite-gated one-concept microlessons are deferred
-     beyond Deep Lesson Pilot v1; keeping the novice UI spare remains a design
-     goal.
+   - **App fit:** clickable glossary chips in the Terms section are implemented.
+     Automatic inline term linking and prerequisite-gated one-concept
+     microlessons remain deferred beyond Deep Lesson Pilot v1; keeping the
+     novice UI spare remains a design goal.
 
 5. **Expertise-reversal / faded worked examples** — support that helps novices
    *harms* more advanced learners (meta-analysis: low-prior-knowledge d=+0.505
