@@ -75,7 +75,7 @@ struct DeepLessonView: View {
 
     private var lessonHeading: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Lesson \(lesson.id) · \(lesson.title)")
+            Text("Lesson · \(lesson.title)")
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
 
@@ -196,9 +196,14 @@ struct DeepLessonView: View {
         accent: Color
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: symbol)
-                .font(.subheadline.bold())
-                .foregroundStyle(accent)
+            Label {
+                Text(title)
+                    .foregroundStyle(.primary)
+            } icon: {
+                Image(systemName: symbol)
+                    .foregroundStyle(accent)
+            }
+            .font(.subheadline.bold())
 
             Text(code)
                 .font(.system(.body, design: .monospaced))
@@ -280,6 +285,7 @@ private struct RecallQuestionCard: View {
     let onAnswer: (_ questionID: String, _ wasCorrect: Bool) -> Void
 
     @State private var selectedChoiceIndex: Int?
+    @AccessibilityFocusState private var feedbackIsFocused: Bool
 
     private var answeredCorrectly: Bool {
         selectedChoiceIndex == question.correctChoiceIndex
@@ -305,14 +311,18 @@ private struct RecallQuestionCard: View {
 
             if selectedChoiceIndex != nil {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label(
-                        answeredCorrectly ? "Correct" : "Not quite",
-                        systemImage: answeredCorrectly
-                            ? "checkmark.circle.fill"
-                            : "xmark.circle.fill"
-                    )
+                    Label {
+                        Text(answeredCorrectly ? "Correct" : "Not quite")
+                            .foregroundStyle(.primary)
+                    } icon: {
+                        Image(
+                            systemName: answeredCorrectly
+                                ? "checkmark.circle.fill"
+                                : "xmark.circle.fill"
+                        )
+                        .foregroundStyle(answeredCorrectly ? Color.green : Color.orange)
+                    }
                     .font(.headline)
-                    .foregroundStyle(answeredCorrectly ? Color.green : Color.orange)
 
                     Text(question.explanation)
                         .font(.callout)
@@ -321,6 +331,7 @@ private struct RecallQuestionCard: View {
                 }
                 .padding(.top, 2)
                 .accessibilityElement(children: .combine)
+                .accessibilityFocused($feedbackIsFocused)
             }
         }
         .padding(.vertical, 10)
@@ -366,6 +377,9 @@ private struct RecallQuestionCard: View {
         guard selectedChoiceIndex == nil else { return }
         selectedChoiceIndex = index
         onAnswer(question.id, index == question.correctChoiceIndex)
+        Task { @MainActor in
+            feedbackIsFocused = true
+        }
     }
 
     private func choiceAccessibilityValue(for index: Int) -> Text {

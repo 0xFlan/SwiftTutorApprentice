@@ -36,23 +36,21 @@ struct SyntaxMicroscopeView: View {
 
     private func tokenItem(_ token: SyntaxMicroscopeToken) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(token.display)
-                    .font(.system(.title3, design: .monospaced).weight(.semibold))
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(Color.secondary.opacity(0.10))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    tokenDisplay(token)
+                        .fixedSize(horizontal: true, vertical: false)
 
-                Spacer(minLength: 8)
+                    Spacer(minLength: 8)
 
-                Label(token.requirement.label, systemImage: token.requirement.symbol)
-                    .font(.caption.bold())
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.secondary.opacity(0.10))
-                    .clipShape(Capsule())
+                    requirementBadge(token.requirement)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    tokenDisplay(token)
+                    requirementBadge(token.requirement)
+                }
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -86,6 +84,25 @@ struct SyntaxMicroscopeView: View {
                 + "\(token.explanation). If you change it: \(token.ifChanged)"
             )
         )
+    }
+
+    private func tokenDisplay(_ token: SyntaxMicroscopeToken) -> some View {
+        Text(token.display)
+            .font(.system(.title3, design: .monospaced).weight(.semibold))
+            .textSelection(.enabled)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Color.secondary.opacity(0.10))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func requirementBadge(_ requirement: SyntaxRequirement) -> some View {
+        Label(requirement.label, systemImage: requirement.symbol)
+            .font(.caption.bold())
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.secondary.opacity(0.10))
+            .clipShape(Capsule())
     }
 }
 
