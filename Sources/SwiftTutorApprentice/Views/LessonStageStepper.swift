@@ -15,12 +15,14 @@ struct LessonStageStepper: View {
     let onOpenModify: () -> Void
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
+        // A vertical ViewThatFits fallback can publish an oversized intrinsic
+        // height while NavigationSplitView is measuring a narrow proposal.
+        // Keep one bounded row and let genuinely narrow windows scroll it.
+        ScrollView(.horizontal) {
             horizontalPath
                 .fixedSize(horizontal: true, vertical: false)
-
-            verticalPath
         }
+        .scrollIndicators(.hidden)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -36,19 +38,6 @@ struct LessonStageStepper: View {
             connector(systemImage: "arrow.right")
             practiceStage(expanded: false)
         }
-    }
-
-    private var verticalPath: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            deepLessonButton(expanded: true)
-            connector(systemImage: "arrow.down")
-                .padding(.leading, 18)
-            modifyButton(expanded: true)
-            connector(systemImage: "arrow.down")
-                .padding(.leading, 18)
-            practiceStage(expanded: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func deepLessonButton(expanded: Bool) -> some View {
