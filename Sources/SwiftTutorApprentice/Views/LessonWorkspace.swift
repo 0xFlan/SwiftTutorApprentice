@@ -15,6 +15,12 @@ struct LessonWorkspace: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var progress: ProgressStore
 
+    @State private var showingDeepLesson = false
+    @State private var showingModify = false
+    @State private var deepLessonPresentation: LessonStagePresentation?
+    @State private var modifyPresentation: LessonStagePresentation?
+    @State private var scheduledDeepLessonTask: Task<Void, Never>?
+
     /// Which single panel to show when the window is too narrow for 3 columns.
     private enum Panel: String, CaseIterable, Identifiable {
         case lesson = "Lesson"
@@ -33,6 +39,17 @@ struct LessonWorkspace: View {
 
             navigationBar
             Divider()
+
+            if model.currentLesson.deepContent != nil {
+                LessonStageStepper(
+                    deepLessonComplete: progress.hasViewedDeepLesson(model.selectedLessonID),
+                    modifyComplete: progress.hasPassedModify(model.selectedLessonID),
+                    practiceComplete: progress.isComplete(model.selectedLessonID),
+                    onOpenDeepLesson: openDeepLessonManually,
+                    onOpenModify: openModifyManually
+                )
+                Divider()
+            }
 
             if model.isPlayingWalkthrough {
                 walkthroughBanner
@@ -83,6 +100,67 @@ struct LessonWorkspace: View {
                     onRun: model.run
                 )
                 .frame(minHeight: 200)
+            }
+        }
+        .onAppear {
+            scheduleAutomaticDeepLesson(for: model.selectedLessonID)
+        }
+        .onChange(of: model.selectedLessonID) { _, lessonID in
+            handleLessonSelectionChange(to: lessonID)
+        }
+        .onChange(of: settings.hasSeenWelcome) { wasSeen, isSeen in
+            guard !wasSeen, isSeen else { return }
+            scheduleAutomaticDeepLesson(
+                for: model.selectedLessonID,
+                delayNanoseconds: 250_000_000
+            )
+        }
+        .onDisappear {
+            cancelScheduledDeepLesson()
+        }
+        .sheet(isPresented: $showingDeepLesson, onDismiss: {
+            deepLessonPresentation = nil
+        }) {
+            if let presentation = deepLessonPresentation {
+                DeepLessonView(
+                    lesson: presentation.lesson,
+                    content: presentation.content,
+                    onViewed: {
+                        progress.markDeepLessonViewed(presentation.lesson.id)
+                    },
+                    onRecallAnswer: { questionID, wasCorrect in
+                        progress.recordRecallAnswer(
+                            lessonID: presentation.lesson.id,
+                            questionID: questionID,
+                            wasCorrect: wasCorrect
+                        )
+                    }
+                )
+            } else {
+                unavailableStageSheet
+            }
+        }
+        .sheet(isPresented: $showingModify, onDismiss: {
+            modifyPresentation = nil
+        }) {
+            if let presentation = modifyPresentation {
+                ModifyTaskView(
+                    task: presentation.content.modifyTask,
+                    existingEditorCode: presentation.existingEditorCode,
+                    onPassed: {
+                        progress.markModifyPassed(presentation.lesson.id)
+                    },
+                    onReplaceEditor: { code, prediction in
+                        guard model.selectedLessonID == presentation.lesson.id else {
+                            return
+                        }
+                        model.code = code
+                        model.prediction = prediction
+                        model.runResult = nil
+                    }
+                )
+            } else {
+                unavailableStageSheet
             }
         }
     }
@@ -226,4 +304,117 @@ struct LessonWorkspace: View {
         .padding(.vertical, 8)
         .animation(.easeInOut(duration: 0.2), value: progress.isComplete(model.selectedLessonID))
     }
+
+    private var unavailableStageSheet: some View {
+        VStack(spacing: 14) {
+            Label("Stage unavailable", systemImage: "exclamationmark.triangle")
+                .font(.headline)
+
+            Text("This lesson's guided content is no longer available.")
+                .foregroundStyle(.secondary)
+
+            Button("Done") {
+                showingDeepLesson = false
+                showingModify = false
+            }
+            .keyboardShortcut(.cancelAction)
+        }
+        .padding(32)
+        .frame(minWidth: 420, minHeight: 220)
+    }
+
+    private func currentStagePresentation() -> LessonStagePresentation? {
+        let lesson = model.currentLesson
+        guard lesson.id == model.selectedLessonID,
+              let content = lesson.deepContent
+        else {
+            return nil
+        }
+
+        return LessonStagePresentation(
+            lesson: lesson,
+            content: content,
+            existingEditorCode: model.code
+        )
+    }
+
+    private func openDeepLessonManually() {
+        cancelScheduledDeepLesson()
+        guard let presentation = currentStagePresentation() else { return }
+        modifyPresentation = nil
+        showingModify = false
+        deepLessonPresentation = presentation
+        showingDeepLesson = true
+    }
+
+    private func openModifyManually() {
+        cancelScheduledDeepLesson()
+        guard let presentation = currentStagePresentation() else { return }
+        deepLessonPresentation = nil
+        showingDeepLesson = false
+        modifyPresentation = presentation
+        showingModify = true
+    }
+
+    private func handleLessonSelectionChange(to lessonID: Int) {
+        cancelScheduledDeepLesson()
+        showingDeepLesson = false
+        showingModify = false
+        deepLessonPresentation = nil
+        modifyPresentation = nil
+        scheduleAutomaticDeepLesson(for: lessonID)
+    }
+
+    private func scheduleAutomaticDeepLesson(
+        for lessonID: Int,
+        delayNanoseconds: UInt64 = 0
+    ) {
+        cancelScheduledDeepLesson()
+
+        guard settings.hasSeenWelcome,
+              lessonID == model.selectedLessonID,
+              model.store.lesson(id: lessonID)?.deepContent != nil,
+              !progress.hasViewedDeepLesson(lessonID)
+        else {
+            return
+        }
+
+        scheduledDeepLessonTask = Task { @MainActor in
+            if delayNanoseconds > 0 {
+                try? await Task.sleep(nanoseconds: delayNanoseconds)
+            }
+            await Task.yield()
+
+            guard !Task.isCancelled,
+                  settings.hasSeenWelcome,
+                  model.selectedLessonID == lessonID,
+                  !progress.hasViewedDeepLesson(lessonID),
+                  !showingDeepLesson,
+                  !showingModify,
+                  let lesson = model.store.lesson(id: lessonID),
+                  let content = lesson.deepContent
+            else {
+                return
+            }
+
+            scheduledDeepLessonTask = nil
+            deepLessonPresentation = LessonStagePresentation(
+                lesson: lesson,
+                content: content,
+                existingEditorCode: model.code
+            )
+            showingDeepLesson = true
+        }
+    }
+
+    private func cancelScheduledDeepLesson() {
+        scheduledDeepLessonTask?.cancel()
+        scheduledDeepLessonTask = nil
+    }
+}
+
+private struct LessonStagePresentation {
+    let lesson: Lesson
+    let content: LessonDeepContent
+    let existingEditorCode: String
 }
