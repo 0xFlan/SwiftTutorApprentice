@@ -21,6 +21,10 @@ final class LessonStore: ObservableObject {
     /// The current lessons, in display order.
     @Published private(set) var lessons: [Lesson] = []
 
+    /// Protects lesson files containing newer nested Deep Lesson data from any
+    /// lossy automatic rewrite or editor mutation.
+    @Published private(set) var isReadOnlyForUnsupportedDeepContent = false
+
     private let fileURL: URL
     private let defaults: [Lesson]
 
@@ -57,19 +61,22 @@ final class LessonStore: ObservableObject {
 
     /// Add a brand-new lesson to the end.
     func add(_ lesson: Lesson) {
+        guard !isReadOnlyForUnsupportedDeepContent else { return }
         lessons.append(lesson)
         save()
     }
 
     /// Replace an existing lesson (matched by id) with an edited version.
     func update(_ lesson: Lesson) {
+        guard !isReadOnlyForUnsupportedDeepContent else { return }
         guard let index = lessons.firstIndex(where: { $0.id == lesson.id }) else { return }
-        lessons[index] = lesson
+        lessons[index] = invalidatingBundledDeepContentIfNeeded(in: lesson)
         save()
     }
 
     /// Delete a lesson by id. Won't delete the last remaining lesson.
     func delete(id: Int) {
+        guard !isReadOnlyForUnsupportedDeepContent else { return }
         guard lessons.count > 1 else { return }
         lessons.removeAll { $0.id == id }
         save()
@@ -77,6 +84,7 @@ final class LessonStore: ObservableObject {
 
     /// Move a lesson up or down in the list (for reordering).
     func move(id: Int, by offset: Int) {
+        guard !isReadOnlyForUnsupportedDeepContent else { return }
         guard let index = lessons.firstIndex(where: { $0.id == id }) else { return }
         let target = index + offset
         guard target >= 0, target < lessons.count else { return }
@@ -86,6 +94,7 @@ final class LessonStore: ObservableObject {
 
     /// Throw away all changes and reload the built-in default curriculum.
     func restoreDefaults() {
+        guard !isReadOnlyForUnsupportedDeepContent else { return }
         lessons = defaults
         save()
     }
@@ -103,6 +112,13 @@ final class LessonStore: ObservableObject {
             return
         }
         lessons = decoded
+
+        if decoded.contains(where: \.hasUnsupportedDeepContent) {
+            isReadOnlyForUnsupportedDeepContent = true
+            print("LessonStore: unsupported Deep Lesson data; lesson editing is read-only")
+            return
+        }
+
         mergeDefaults()
     }
 
@@ -118,6 +134,14 @@ final class LessonStore: ObservableObject {
         var changed = false
 
         for index in lessons.indices {
+            let compatibleLesson = invalidatingBundledDeepContentIfNeeded(
+                in: lessons[index]
+            )
+            if compatibleLesson != lessons[index] {
+                lessons[index] = compatibleLesson
+                changed = true
+            }
+
             let savedLesson = lessons[index]
             guard let defaultLesson = defaults.first(where: { $0.id == savedLesson.id }),
                   defaultLesson.kind == savedLesson.kind,
@@ -141,7 +165,25 @@ final class LessonStore: ObservableObject {
         }
     }
 
+    private func invalidatingBundledDeepContentIfNeeded(in lesson: Lesson) -> Lesson {
+        guard lesson.deepContent?.provenance?.source == .bundled else {
+            return lesson
+        }
+
+        guard let defaultLesson = defaults.first(where: { $0.id == lesson.id }),
+              defaultLesson.kind == lesson.kind,
+              defaultLesson.starterCode == lesson.starterCode
+        else {
+            var invalidatedLesson = lesson
+            invalidatedLesson.deepContent = nil
+            return invalidatedLesson
+        }
+
+        return lesson
+    }
+
     private func save() {
+        guard !isReadOnlyForUnsupportedDeepContent else { return }
         do {
             try FileManager.default.createDirectory(
                 at: fileURL.deletingLastPathComponent(),

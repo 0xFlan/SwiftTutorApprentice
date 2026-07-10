@@ -24,6 +24,15 @@ enum SyntaxRequirement: String, Codable, Hashable {
     case contextual
 }
 
+struct LessonDeepContentProvenance: Codable, Hashable {
+    enum Source: String, Codable, Hashable {
+        case bundled
+    }
+
+    let source: Source
+    let revision: Int
+}
+
 struct LessonDeepContent: Codable, Hashable {
     let title: String
     let introduction: String
@@ -31,6 +40,25 @@ struct LessonDeepContent: Codable, Hashable {
     let microscopeTokens: [SyntaxMicroscopeToken]
     let modifyTask: ModifyTask
     let recallQuestions: [RecallQuestion]
+    let provenance: LessonDeepContentProvenance?
+
+    init(
+        title: String,
+        introduction: String,
+        segments: [DeepLessonSegment],
+        microscopeTokens: [SyntaxMicroscopeToken],
+        modifyTask: ModifyTask,
+        recallQuestions: [RecallQuestion],
+        provenance: LessonDeepContentProvenance? = nil
+    ) {
+        self.title = title
+        self.introduction = introduction
+        self.segments = segments
+        self.microscopeTokens = microscopeTokens
+        self.modifyTask = modifyTask
+        self.recallQuestions = recallQuestions
+        self.provenance = provenance
+    }
 }
 
 struct DeepLessonSegment: Codable, Hashable {

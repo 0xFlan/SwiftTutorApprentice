@@ -26,7 +26,10 @@ final class LessonStoreMigrationTests: XCTestCase {
 
     func testCompatibleBuiltInLessonReceivesOnlyStockDeepContent() throws {
         var stockLesson = Curriculum.defaultLessons[0]
-        stockLesson.deepContent = pilotDeepContent(title: "Stock deep content")
+        stockLesson.deepContent = pilotDeepContent(
+            title: "Stock deep content",
+            provenance: bundledProvenance
+        )
         let secondStockLesson = Curriculum.defaultLessons[1]
 
         var editedLesson = stockLesson
@@ -65,7 +68,10 @@ final class LessonStoreMigrationTests: XCTestCase {
 
     func testBuiltInIDWithDifferentStarterCodeDoesNotReceiveStockDeepContent() throws {
         var stockLesson = Curriculum.defaultLessons[0]
-        stockLesson.deepContent = pilotDeepContent(title: "Stock deep content")
+        stockLesson.deepContent = pilotDeepContent(
+            title: "Stock deep content",
+            provenance: bundledProvenance
+        )
 
         var customizedLesson = stockLesson
         customizedLesson.title = "My incompatible lesson"
@@ -81,7 +87,10 @@ final class LessonStoreMigrationTests: XCTestCase {
 
     func testBuiltInIDAndStarterCodeWithDifferentKindDoesNotReceiveStockDeepContent() throws {
         var stockLesson = Curriculum.defaultLessons[0]
-        stockLesson.deepContent = pilotDeepContent(title: "Stock deep content")
+        stockLesson.deepContent = pilotDeepContent(
+            title: "Stock deep content",
+            provenance: bundledProvenance
+        )
 
         var customizedLesson = stockLesson
         customizedLesson.kind = .concept
@@ -96,7 +105,10 @@ final class LessonStoreMigrationTests: XCTestCase {
 
     func testSavedDeepContentIsPreservedInsteadOfReplacingItWithStockContent() throws {
         var stockLesson = Curriculum.defaultLessons[0]
-        stockLesson.deepContent = pilotDeepContent(title: "Stock deep content")
+        stockLesson.deepContent = pilotDeepContent(
+            title: "Stock deep content",
+            provenance: bundledProvenance
+        )
 
         var customizedLesson = stockLesson
         customizedLesson.deepContent = pilotDeepContent(title: "My deep content")
@@ -109,12 +121,162 @@ final class LessonStoreMigrationTests: XCTestCase {
         XCTAssertEqual(try readLessons(), [customizedLesson])
     }
 
+    func testStarterCodeEditImmediatelyRemovesBundledContentAndKeepsItRemovedAfterReopen() throws {
+        var stockLesson = Curriculum.defaultLessons[0]
+        stockLesson.deepContent = pilotDeepContent(
+            title: "Stock deep content",
+            provenance: bundledProvenance
+        )
+        var savedLesson = stockLesson
+        savedLesson.deepContent = nil
+        try writeLessons([savedLesson])
+
+        let store = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
+        XCTAssertEqual(store.lessons[0].deepContent?.provenance, bundledProvenance)
+
+        var editedLesson = store.lessons[0]
+        editedLesson.title = "Keep this learner title"
+        editedLesson.starterCode = "print(\"Learner exercise\")"
+        store.update(editedLesson)
+
+        XCTAssertEqual(store.lessons[0].title, "Keep this learner title")
+        XCTAssertNil(store.lessons[0].deepContent)
+        XCTAssertNil(try readLessons()[0].deepContent)
+
+        let reopened = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
+        XCTAssertEqual(reopened.lessons[0].title, "Keep this learner title")
+        XCTAssertEqual(reopened.lessons[0].starterCode, "print(\"Learner exercise\")")
+        XCTAssertNil(reopened.lessons[0].deepContent)
+    }
+
+    func testKindEditImmediatelyRemovesBundledContentAndKeepsItRemovedAfterReopen() throws {
+        var stockLesson = Curriculum.defaultLessons[0]
+        stockLesson.deepContent = pilotDeepContent(
+            title: "Stock deep content",
+            provenance: bundledProvenance
+        )
+        try writeLessons([stockLesson])
+
+        let store = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
+        var editedLesson = store.lessons[0]
+        editedLesson.kind = .concept
+        store.update(editedLesson)
+
+        XCTAssertEqual(store.lessons[0].kind, .concept)
+        XCTAssertNil(store.lessons[0].deepContent)
+        XCTAssertNil(try readLessons()[0].deepContent)
+
+        let reopened = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
+        XCTAssertEqual(reopened.lessons[0].kind, .concept)
+        XCTAssertNil(reopened.lessons[0].deepContent)
+    }
+
+    func testCustomProvenanceNilContentSurvivesStarterEditAndReopen() throws {
+        var stockLesson = Curriculum.defaultLessons[0]
+        stockLesson.deepContent = pilotDeepContent(
+            title: "Stock deep content",
+            provenance: bundledProvenance
+        )
+        var customizedLesson = stockLesson
+        customizedLesson.deepContent = pilotDeepContent(title: "Learner-authored explanation")
+        try writeLessons([customizedLesson])
+
+        let store = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
+        var editedLesson = store.lessons[0]
+        editedLesson.starterCode = "print(\"My custom exercise\")"
+        store.update(editedLesson)
+
+        XCTAssertEqual(store.lessons[0].deepContent?.title, "Learner-authored explanation")
+        XCTAssertNil(store.lessons[0].deepContent?.provenance)
+
+        let reopened = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
+        XCTAssertEqual(reopened.lessons[0].deepContent?.title, "Learner-authored explanation")
+        XCTAssertNil(reopened.lessons[0].deepContent?.provenance)
+    }
+
+    func testLoadRemovesPersistedBundledContentWhenStarterNoLongerMatchesDefault() throws {
+        var stockLesson = Curriculum.defaultLessons[0]
+        stockLesson.deepContent = pilotDeepContent(
+            title: "Stock deep content",
+            provenance: bundledProvenance
+        )
+        var staleLesson = stockLesson
+        staleLesson.starterCode = "print(\"Changed before this app version\")"
+        try writeLessons([staleLesson])
+
+        let store = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
+
+        XCTAssertEqual(store.lessons[0].starterCode, staleLesson.starterCode)
+        XCTAssertNil(store.lessons[0].deepContent)
+        XCTAssertNil(try readLessons()[0].deepContent)
+    }
+
+    func testLoadRemovesBundledContentWhenNoMatchingDefaultExists() throws {
+        var orphanedBundledLesson = Curriculum.defaultLessons[0]
+        orphanedBundledLesson.id = 9_101
+        try writeLessons([orphanedBundledLesson])
+
+        let store = LessonStore(fileURL: fixtureURL, defaults: [])
+
+        XCTAssertEqual(store.lessons[0].id, orphanedBundledLesson.id)
+        XCTAssertNil(store.lessons[0].deepContent)
+        XCTAssertNil(try readLessons()[0].deepContent)
+    }
+
+    func testUnsupportedNestedDeepContentMakesStoreReadOnlyAndPreservesEveryByte() throws {
+        let unsupportedLesson = Curriculum.defaultLessons[0]
+        let secondSavedLesson = Curriculum.defaultLessons[1]
+        let missingDefault = Curriculum.defaultLessons[2]
+        let originalData = try encodedLessonsWithFutureMicroscopeRequirement(
+            [unsupportedLesson, secondSavedLesson]
+        )
+        try originalData.write(to: fixtureURL, options: .atomic)
+
+        let store = LessonStore(
+            fileURL: fixtureURL,
+            defaults: [unsupportedLesson, secondSavedLesson, missingDefault]
+        )
+        let safelyDecodedLessons = store.lessons
+
+        XCTAssertTrue(store.isReadOnlyForUnsupportedDeepContent)
+        XCTAssertEqual(store.lessons.map(\.id), [unsupportedLesson.id, secondSavedLesson.id])
+        XCTAssertTrue(store.lessons[0].hasUnsupportedDeepContent)
+        XCTAssertNil(store.lessons[0].deepContent)
+        XCTAssertFalse(store.lessons[1].hasUnsupportedDeepContent)
+        XCTAssertEqual(try Data(contentsOf: fixtureURL), originalData)
+
+        var addedLesson = missingDefault
+        addedLesson.id = 9_001
+        store.add(addedLesson)
+        XCTAssertEqual(store.lessons, safelyDecodedLessons)
+        XCTAssertEqual(try Data(contentsOf: fixtureURL), originalData)
+
+        var updatedLesson = store.lessons[1]
+        updatedLesson.title = "This update must not be applied"
+        store.update(updatedLesson)
+        XCTAssertEqual(store.lessons, safelyDecodedLessons)
+        XCTAssertEqual(try Data(contentsOf: fixtureURL), originalData)
+
+        store.delete(id: secondSavedLesson.id)
+        XCTAssertEqual(store.lessons, safelyDecodedLessons)
+        XCTAssertEqual(try Data(contentsOf: fixtureURL), originalData)
+
+        store.move(id: unsupportedLesson.id, by: 1)
+        XCTAssertEqual(store.lessons, safelyDecodedLessons)
+        XCTAssertEqual(try Data(contentsOf: fixtureURL), originalData)
+
+        store.restoreDefaults()
+        XCTAssertEqual(store.lessons, safelyDecodedLessons)
+        XCTAssertEqual(try Data(contentsOf: fixtureURL), originalData)
+    }
+
     func testMissingDefaultIsAppendedOnceAndExistingOrderIsPreservedAcrossReopen() throws {
         let firstStockLesson = Curriculum.defaultLessons[0]
         let missingStockLesson = Curriculum.defaultLessons[1]
         var customLesson = Curriculum.defaultLessons[2]
         customLesson.id = 9_001
         customLesson.title = "My custom lesson"
+        customLesson.deepContent = nil
         try writeLessons([customLesson, firstStockLesson])
 
         let defaults = [firstStockLesson, missingStockLesson]
@@ -181,7 +343,32 @@ final class LessonStoreMigrationTests: XCTestCase {
         return try JSONDecoder().decode([Lesson].self, from: data)
     }
 
-    private func pilotDeepContent(title: String) -> LessonDeepContent {
+    private var bundledProvenance: LessonDeepContentProvenance {
+        LessonDeepContentProvenance(source: .bundled, revision: 1)
+    }
+
+    private func encodedLessonsWithFutureMicroscopeRequirement(
+        _ lessons: [Lesson]
+    ) throws -> Data {
+        let encoded = try JSONEncoder().encode(lessons)
+        var array = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [[String: Any]]
+        )
+        var deepContent = try XCTUnwrap(array[0]["deepContent"] as? [String: Any])
+        var tokens = try XCTUnwrap(deepContent["microscopeTokens"] as? [[String: Any]])
+        tokens[0]["requirement"] = "introduced-by-a-future-app"
+        deepContent["microscopeTokens"] = tokens
+        array[0]["deepContent"] = deepContent
+        return try JSONSerialization.data(
+            withJSONObject: array,
+            options: [.prettyPrinted, .sortedKeys]
+        )
+    }
+
+    private func pilotDeepContent(
+        title: String,
+        provenance: LessonDeepContentProvenance? = nil
+    ) -> LessonDeepContent {
         LessonDeepContent(
             title: title,
             introduction: "A synthetic migration fixture.",
@@ -206,7 +393,8 @@ final class LessonStoreMigrationTests: XCTestCase {
                 successExplanation: "The changed string is printed.",
                 conceptIDs: ["segment"]
             ),
-            recallQuestions: []
+            recallQuestions: [],
+            provenance: provenance
         )
     }
 }

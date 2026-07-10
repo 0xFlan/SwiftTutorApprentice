@@ -123,7 +123,8 @@ enum DeepLessonPilotContent {
                 explanation: "Characters inside a String are data. In this call, spaces just inside the parentheses are optional formatting; other whitespace may separate tokens, and operator whitespace can matter.",
                 conceptIDs: ["lesson-1-string-data-versus-style"]
             )
-        ]
+        ],
+        provenance: LessonDeepContentProvenance(source: .bundled, revision: 1)
     )
 
     static let lesson2 = LessonDeepContent(
@@ -243,7 +244,8 @@ enum DeepLessonPilotContent {
                 explanation: "Quotation marks make name a String literal. Without them, print(name) looks up the binding's value.",
                 conceptIDs: ["lesson-2-name-versus-literal"]
             )
-        ]
+        ],
+        provenance: LessonDeepContentProvenance(source: .bundled, revision: 1)
     )
 
     static let lesson3 = LessonDeepContent(
@@ -366,6 +368,7 @@ enum DeepLessonPilotContent {
                 explanation: "Without quotation marks, 1 is an Int literal. \"1\" would be a String literal instead.",
                 conceptIDs: ["lesson-3-int-literal"]
             )
-        ]
+        ],
+        provenance: LessonDeepContentProvenance(source: .bundled, revision: 1)
     )
 }

@@ -22,6 +22,7 @@ final class LessonCompatibilityTests: XCTestCase {
         XCTAssertEqual(lesson.hint, "My preserved hint")
         XCTAssertEqual(lesson.kind, .code)
         XCTAssertNil(lesson.deepContent)
+        XCTAssertFalse(lesson.hasUnsupportedDeepContent)
     }
 
     func testCustomLessonIDWithoutNewFieldsStillDecodes() throws {
@@ -31,6 +32,7 @@ final class LessonCompatibilityTests: XCTestCase {
         XCTAssertEqual(lesson.id, 9_001)
         XCTAssertEqual(lesson.kind, .code)
         XCTAssertNil(lesson.deepContent)
+        XCTAssertFalse(lesson.hasUnsupportedDeepContent)
     }
 
     func testMalformedDeepContentFallsBackToNil() throws {
@@ -44,6 +46,18 @@ final class LessonCompatibilityTests: XCTestCase {
 
         XCTAssertEqual(lesson.id, 41)
         XCTAssertNil(lesson.deepContent)
+        XCTAssertTrue(lesson.hasUnsupportedDeepContent)
+    }
+
+    func testNullDeepContentIsMissingRatherThanUnsupported() throws {
+        var lesson = lessonJSONObject(id: 43)
+        lesson["deepContent"] = NSNull()
+        let data = try JSONSerialization.data(withJSONObject: lesson)
+
+        let decoded = try JSONDecoder().decode(Lesson.self, from: data)
+
+        XCTAssertNil(decoded.deepContent)
+        XCTAssertFalse(decoded.hasUnsupportedDeepContent)
     }
 
     func testMalformedRequiredLegacyFieldStillThrowsDecodingError() throws {
@@ -102,7 +116,8 @@ final class LessonCompatibilityTests: XCTestCase {
                     explanation: "The parentheses contain print's arguments.",
                     conceptIDs: ["print-call"]
                 )
-            ]
+            ],
+            provenance: LessonDeepContentProvenance(source: .bundled, revision: 1)
         )
         let lesson = Lesson(
             id: 73,
@@ -126,6 +141,16 @@ final class LessonCompatibilityTests: XCTestCase {
 
         XCTAssertEqual(decoded, lesson)
         XCTAssertEqual(decoded.deepContent, content)
+        XCTAssertEqual(
+            decoded.deepContent?.provenance,
+            LessonDeepContentProvenance(source: .bundled, revision: 1)
+        )
+        XCTAssertFalse(decoded.hasUnsupportedDeepContent)
+
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        XCTAssertNil(object["hasUnsupportedDeepContent"])
     }
 
     private func legacyLessonsFixtureData() throws -> Data {

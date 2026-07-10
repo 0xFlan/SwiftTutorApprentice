@@ -71,6 +71,10 @@ struct Lesson: Identifiable, Hashable, Codable {
     /// Optional concept-first teaching content for supported lessons.
     /// Defaults to `nil` so legacy and custom lessons keep their current flow.
     var deepContent: LessonDeepContent? = nil
+
+    /// True only when a saved lesson contains Deep Lesson data this app cannot
+    /// decode. This runtime safety state is deliberately excluded from JSON.
+    private(set) var hasUnsupportedDeepContent = false
 }
 
 // Custom decoding lives in an extension so the memberwise initializer is still
@@ -99,13 +103,20 @@ extension Lesson {
         successMessage = try c.decode(String.self, forKey: .successMessage)
         hint = try c.decode(String.self, forKey: .hint)
         kind = try c.decodeIfPresent(LessonKind.self, forKey: .kind) ?? .code
-        do {
-            deepContent = try c.decodeIfPresent(
-                LessonDeepContent.self,
-                forKey: .deepContent
-            )
-        } catch {
+        if !c.contains(.deepContent) {
             deepContent = nil
+            hasUnsupportedDeepContent = false
+        } else if try c.decodeNil(forKey: .deepContent) {
+            deepContent = nil
+            hasUnsupportedDeepContent = false
+        } else {
+            do {
+                deepContent = try c.decode(LessonDeepContent.self, forKey: .deepContent)
+                hasUnsupportedDeepContent = false
+            } catch {
+                deepContent = nil
+                hasUnsupportedDeepContent = true
+            }
         }
     }
 }

@@ -40,6 +40,11 @@ struct LessonWorkspace: View {
             navigationBar
             Divider()
 
+            if model.store.isReadOnlyForUnsupportedDeepContent {
+                readOnlyLessonsBanner
+                Divider()
+            }
+
             if progress.isReadOnlyForUnsupportedVersion {
                 readOnlyProgressBanner
                 Divider()
@@ -209,6 +214,10 @@ struct LessonWorkspace: View {
                 if progress.isComplete(model.selectedLessonID) {
                     Label("Read", systemImage: "checkmark.seal.fill")
                         .foregroundStyle(.green)
+                } else if progress.isReadOnlyForUnsupportedVersion {
+                    Label("Progress read-only", systemImage: "lock.fill")
+                        .foregroundStyle(.secondary)
+                        .help("Mark as read is unavailable because this progress file was created by a newer app version.")
                 } else {
                     Button {
                         model.markCurrentLessonRead()
@@ -257,6 +266,30 @@ struct LessonWorkspace: View {
                     .foregroundStyle(.primary)
 
                 Text("This progress file was created by a newer app version. Completion and Deep Lesson or Modify activity cannot be saved. You can still study lessons and run code.")
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.11))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var readOnlyLessonsBanner: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Lesson editing is disabled")
+                    .font(.callout.bold())
+                    .foregroundStyle(.primary)
+
+                Text("This lesson file contains newer or unsupported Deep Lesson data. Automatic enrichment and lesson editing are disabled to protect it. Existing learning content remains viewable.")
                     .font(.caption)
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)

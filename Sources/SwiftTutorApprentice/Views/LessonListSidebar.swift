@@ -58,7 +58,8 @@ struct LessonListSidebar: View {
                     Label("Manage lessons", systemImage: "square.and.pencil")
                         .frame(maxWidth: .infinity)
                 }
-                .help("Add, edit, reorder, or delete lessons — all inside the app")
+                .help(manageLessonsHelp)
+                .disabled(store.isReadOnlyForUnsupportedDeepContent)
 
                 Button {
                     onOpenSettings()
@@ -103,5 +104,13 @@ struct LessonListSidebar: View {
         }
 
         return "Clear completed lessons and all Deep Lesson and Modify activity"
+    }
+
+    private var manageLessonsHelp: String {
+        if store.isReadOnlyForUnsupportedDeepContent {
+            return "Lesson editing is unavailable because this lesson file contains newer or unsupported Deep Lesson data."
+        }
+
+        return "Add, edit, reorder, or delete lessons — all inside the app"
     }
 }

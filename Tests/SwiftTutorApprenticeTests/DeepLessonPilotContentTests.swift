@@ -26,6 +26,14 @@ final class DeepLessonPilotContentTests: XCTestCase {
         }
     }
 
+    func testPilotLessonsPinBundledProvenanceRevisionOne() throws {
+        let expected = LessonDeepContentProvenance(source: .bundled, revision: 1)
+
+        for lessonID in 1...3 {
+            XCTAssertEqual(try pilotContent(lessonID: lessonID).provenance, expected)
+        }
+    }
+
     func testEveryPilotLessonMeetsTheCompleteContentContract() throws {
         for lessonID in 1...3 {
             let content = try pilotContent(lessonID: lessonID)
