@@ -44,6 +44,11 @@ final class DeepLessonPilotContentTests: XCTestCase {
                 assertNotBlank(segment.correctCode, "Segment \(segment.id) correct code")
                 assertNotBlank(segment.wrongCode, "Segment \(segment.id) wrong code")
                 assertNotBlank(segment.wrongExplanation, "Segment \(segment.id) wrong explanation")
+                XCTAssertNotEqual(
+                    segment.correctCode,
+                    segment.wrongCode,
+                    "Segment \(segment.id) should contrast two different examples"
+                )
             }
 
             for token in content.microscopeTokens {
@@ -68,6 +73,10 @@ final class DeepLessonPilotContentTests: XCTestCase {
             modifyTask.conceptIDs.forEach {
                 assertNotBlank($0.rawValue, "Modify concept ID")
             }
+            XCTAssertEqual(
+                modifyTask.starterCode,
+                Curriculum.defaultLesson(id: lessonID)?.starterCode
+            )
 
             for question in content.recallQuestions {
                 assertNamespaced(question.id, namespace: namespace)
@@ -88,6 +97,147 @@ final class DeepLessonPilotContentTests: XCTestCase {
             assertUnique(content.microscopeTokens.map(\.id), category: "token", lessonID: lessonID)
             assertUnique(content.recallQuestions.map(\.id), category: "recall question", lessonID: lessonID)
         }
+    }
+
+    func testPilotUsesTheExactStableIDAndConceptVocabulary() throws {
+        try assertStableVocabulary(
+            lessonID: 1,
+            segmentIDs: [
+                "lesson-1-print-call",
+                "lesson-1-missing-quotes",
+                "lesson-1-different-literal",
+                "lesson-1-space-location"
+            ],
+            tokenIDs: [
+                "lesson-1-token-print",
+                "lesson-1-token-parentheses",
+                "lesson-1-token-quotation-marks",
+                "lesson-1-token-literal-contents",
+                "lesson-1-token-outer-spacing"
+            ],
+            modifyID: "lesson-1-modify-message",
+            recallIDs: [
+                "lesson-1-recall-quotation-marks",
+                "lesson-1-recall-spaces"
+            ],
+            conceptIDs: [
+                "lesson-1-print-function-call",
+                "lesson-1-string-literal",
+                "lesson-1-string-data-versus-style"
+            ]
+        )
+        try assertStableVocabulary(
+            lessonID: 2,
+            segmentIDs: [
+                "lesson-2-let-binding",
+                "lesson-2-string-value",
+                "lesson-2-quoted-name",
+                "lesson-2-let-reassignment"
+            ],
+            tokenIDs: [
+                "lesson-2-token-let",
+                "lesson-2-token-name",
+                "lesson-2-token-assignment",
+                "lesson-2-token-string",
+                "lesson-2-token-assignment-spacing"
+            ],
+            modifyID: "lesson-2-modify-stored-name",
+            recallIDs: [
+                "lesson-2-recall-assignment",
+                "lesson-2-recall-quoted-name"
+            ],
+            conceptIDs: [
+                "lesson-2-constant-binding",
+                "lesson-2-assignment-direction",
+                "lesson-2-name-versus-literal"
+            ]
+        )
+        try assertStableVocabulary(
+            lessonID: 3,
+            segmentIDs: [
+                "lesson-3-var-binding",
+                "lesson-3-reassignment",
+                "lesson-3-integer-literal",
+                "lesson-3-let-reassignment"
+            ],
+            tokenIDs: [
+                "lesson-3-token-var",
+                "lesson-3-token-count",
+                "lesson-3-token-assignment",
+                "lesson-3-token-int-literal",
+                "lesson-3-token-assignment-spacing"
+            ],
+            modifyID: "lesson-3-modify-count",
+            recallIDs: [
+                "lesson-3-recall-var",
+                "lesson-3-recall-int-literal"
+            ],
+            conceptIDs: [
+                "lesson-3-mutable-binding",
+                "lesson-3-reassignment",
+                "lesson-3-int-literal"
+            ]
+        )
+    }
+
+    func testConcreteExampleChoicesAreContextual() throws {
+        XCTAssertEqual(
+            try token("lesson-2-token-name", lessonID: 2).requirement,
+            .contextual
+        )
+        XCTAssertEqual(
+            try token("lesson-2-token-string", lessonID: 2).requirement,
+            .contextual
+        )
+        XCTAssertEqual(
+            try token("lesson-3-token-count", lessonID: 3).requirement,
+            .contextual
+        )
+        XCTAssertEqual(
+            try token("lesson-3-token-int-literal", lessonID: 3).requirement,
+            .contextual
+        )
+    }
+
+    func testRecallAnswersUsePinnedVariedPositions() throws {
+        let expectedIndexes = [
+            "lesson-1-recall-quotation-marks": 1,
+            "lesson-1-recall-spaces": 0,
+            "lesson-2-recall-assignment": 2,
+            "lesson-2-recall-quoted-name": 1,
+            "lesson-3-recall-var": 1,
+            "lesson-3-recall-int-literal": 0
+        ]
+        var actualIndexes: [String: Int] = [:]
+
+        for lessonID in 1...3 {
+            for question in try pilotContent(lessonID: lessonID).recallQuestions {
+                actualIndexes[question.id] = question.correctChoiceIndex
+            }
+        }
+
+        XCTAssertEqual(actualIndexes, expectedIndexes)
+        XCTAssertGreaterThanOrEqual(Set(actualIndexes.values).count, 2)
+    }
+
+    func testLessonOneDistinguishesStandardOutputFromItsConsoleDisplay() throws {
+        let content = try pilotContent(lessonID: 1)
+        let introduction = content.introduction.lowercased()
+
+        XCTAssertTrue(introduction.contains("normal output stream"))
+        XCTAssertTrue(introduction.contains("captures"))
+        XCTAssertTrue(introduction.contains("console"))
+        XCTAssertFalse(introduction.contains("text area"))
+    }
+
+    func testLessonOneNarrowsItsOptionalWhitespaceExplanation() throws {
+        let content = try pilotContent(lessonID: 1)
+        let spaceSegment = try segment("lesson-1-space-location", in: content)
+        let explanation = spaceSegment.explanation.lowercased()
+
+        XCTAssertTrue(explanation.contains("optional spaces immediately inside print's parentheses"))
+        XCTAssertTrue(explanation.contains("some whitespace separates tokens"))
+        XCTAssertTrue(explanation.contains("operator whitespace can matter"))
     }
 
     func testLessonOneIncludesBothNamedMisconceptions() throws {
@@ -156,6 +306,40 @@ final class DeepLessonPilotContentTests: XCTestCase {
         in content: LessonDeepContent
     ) throws -> DeepLessonSegment {
         try XCTUnwrap(content.segments.first { $0.id == id }, "Missing segment \(id)")
+    }
+
+    private func token(
+        _ id: String,
+        lessonID: Int
+    ) throws -> SyntaxMicroscopeToken {
+        let content = try pilotContent(lessonID: lessonID)
+        return try XCTUnwrap(
+            content.microscopeTokens.first { $0.id == id },
+            "Missing token \(id)"
+        )
+    }
+
+    private func assertStableVocabulary(
+        lessonID: Int,
+        segmentIDs: Set<String>,
+        tokenIDs: Set<String>,
+        modifyID: String,
+        recallIDs: Set<String>,
+        conceptIDs: Set<String>,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let content = try pilotContent(lessonID: lessonID)
+        let actualConceptIDs = Set(
+            content.modifyTask.conceptIDs.map(\.rawValue)
+                + content.recallQuestions.flatMap { $0.conceptIDs.map(\.rawValue) }
+        )
+
+        XCTAssertEqual(Set(content.segments.map(\.id)), segmentIDs, file: file, line: line)
+        XCTAssertEqual(Set(content.microscopeTokens.map(\.id)), tokenIDs, file: file, line: line)
+        XCTAssertEqual(content.modifyTask.id, modifyID, file: file, line: line)
+        XCTAssertEqual(Set(content.recallQuestions.map(\.id)), recallIDs, file: file, line: line)
+        XCTAssertEqual(actualConceptIDs, conceptIDs, file: file, line: line)
     }
 
     private func assertNamespaced(

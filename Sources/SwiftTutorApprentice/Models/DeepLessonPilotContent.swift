@@ -9,7 +9,7 @@ import Foundation
 enum DeepLessonPilotContent {
     static let lesson1 = LessonDeepContent(
         title: "How a print Call Becomes Output",
-        introduction: "A print call gives Swift one value to show. We will follow each required mark from your code to standard output, the text area where a program reports its result.",
+        introduction: "A print call gives Swift one value to show. Standard output is the program's normal output stream; this app captures that stream and shows it in the console.",
         segments: [
             DeepLessonSegment(
                 id: "lesson-1-print-call",
@@ -38,7 +38,7 @@ enum DeepLessonPilotContent {
             DeepLessonSegment(
                 id: "lesson-1-space-location",
                 title: "Know which spaces are data",
-                explanation: "A space inside the quotation marks belongs to the String and appears in the output. Spaces outside the quotation marks only arrange the Swift code for people, so they are a style convention.",
+                explanation: "A space inside the quotation marks belongs to the String and appears in the output. In this exact call, optional spaces immediately inside print's parentheses only change formatting. Elsewhere, some whitespace separates tokens, and operator whitespace can matter to how Swift reads code.",
                 correctCode: "print(\"Hello, Swift!\")",
                 wrongCode: "print(\"Hello,Swift!\")",
                 wrongExplanation: "Removing the space inside the String changes the data, so the output becomes Hello,Swift!"
@@ -80,10 +80,10 @@ enum DeepLessonPilotContent {
             SyntaxMicroscopeToken(
                 id: "lesson-1-token-outer-spacing",
                 display: "print( \"Hello, Swift!\" )",
-                role: "Space the code for human readers",
+                role: "Space this example inside its parentheses",
                 requirement: .convention,
-                explanation: "Optional spaces outside the String are a formatting choice; most Swift code omits these particular spaces.",
-                ifChanged: "Adding or removing these outer spaces does not change the String or the output."
+                explanation: "The optional spaces immediately inside print's parentheses are a formatting choice; common Swift style omits them here.",
+                ifChanged: "Adding or removing these particular spaces does not change the String or the output. Other whitespace can separate tokens or affect how an operator is read."
             )
         ],
         modifyTask: ModifyTask(
@@ -104,11 +104,11 @@ enum DeepLessonPilotContent {
                 id: "lesson-1-recall-quotation-marks",
                 prompt: "Why does Hello, Swift! need quotation marks in this call?",
                 choices: [
-                    "They tell Swift the characters form a String literal",
                     "They make print run twice",
+                    "They tell Swift the characters form a String literal",
                     "They add quotation marks to the output"
                 ],
-                correctChoiceIndex: 0,
+                correctChoiceIndex: 1,
                 explanation: "Quotation marks bound text written directly in code. print receives the String between them, not the marks themselves.",
                 conceptIDs: ["lesson-1-string-literal"]
             ),
@@ -117,10 +117,10 @@ enum DeepLessonPilotContent {
                 prompt: "Which space changes the printed data if you remove it?",
                 choices: [
                     "A space inside the quotation marks",
-                    "An optional formatting space outside the quotation marks"
+                    "An optional space immediately inside print's parentheses"
                 ],
                 correctChoiceIndex: 0,
-                explanation: "Characters inside a String are data. Optional whitespace outside it is a code-formatting convention.",
+                explanation: "Characters inside a String are data. In this call, spaces just inside the parentheses are optional formatting; other whitespace may separate tokens, and operator whitespace can matter.",
                 conceptIDs: ["lesson-1-string-data-versus-style"]
             )
         ]
@@ -176,7 +176,7 @@ enum DeepLessonPilotContent {
                 id: "lesson-2-token-name",
                 display: "name",
                 role: "Name the stored value",
-                requirement: .required,
+                requirement: .contextual,
                 explanation: "You choose this identifier so later code can refer to the stored String clearly.",
                 ifChanged: "Another valid identifier works, but every later use must use that same chosen name."
             ),
@@ -192,7 +192,7 @@ enum DeepLessonPilotContent {
                 id: "lesson-2-token-string",
                 display: "\"Alex\"",
                 role: "Provide the String value",
-                requirement: .required,
+                requirement: .contextual,
                 explanation: "The paired quotation marks make Alex text written directly in the program.",
                 ifChanged: "Removing the marks makes Swift search for an identifier named Alex instead of creating a String."
             ),
@@ -224,11 +224,11 @@ enum DeepLessonPilotContent {
                 id: "lesson-2-recall-assignment",
                 prompt: "In let name = \"Alex\", what does assignment do?",
                 choices: [
-                    "Stores the right-hand String under the left-hand name",
                     "Stores the word name inside Alex",
-                    "Prints both sides immediately"
+                    "Prints both sides immediately",
+                    "Stores the right-hand String under the left-hand name"
                 ],
-                correctChoiceIndex: 0,
+                correctChoiceIndex: 2,
                 explanation: "Assignment takes the value on the right and connects it to the binding named on the left.",
                 conceptIDs: ["lesson-2-assignment-direction"]
             ),
@@ -236,10 +236,10 @@ enum DeepLessonPilotContent {
                 id: "lesson-2-recall-quoted-name",
                 prompt: "What does print(\"name\") print?",
                 choices: [
-                    "The literal word name",
-                    "The value stored under name"
+                    "The value stored under name",
+                    "The literal word name"
                 ],
-                correctChoiceIndex: 0,
+                correctChoiceIndex: 1,
                 explanation: "Quotation marks make name a String literal. Without them, print(name) looks up the binding's value.",
                 conceptIDs: ["lesson-2-name-versus-literal"]
             )
@@ -296,7 +296,7 @@ enum DeepLessonPilotContent {
                 id: "lesson-3-token-count",
                 display: "count",
                 role: "Name the current value",
-                requirement: .required,
+                requirement: .contextual,
                 explanation: "Both assignment lines use the same name, so the second one updates the binding created by the first.",
                 ifChanged: "Using a different name on the second line would target a different binding rather than update count."
             ),
@@ -312,7 +312,7 @@ enum DeepLessonPilotContent {
                 id: "lesson-3-token-int-literal",
                 display: "1",
                 role: "Provide an Int literal",
-                requirement: .required,
+                requirement: .contextual,
                 explanation: "A whole number without quotation marks is an Int value that can be used as a number.",
                 ifChanged: "Adding quotation marks produces String text instead of an Int and changes what values count can hold."
             ),
@@ -344,11 +344,11 @@ enum DeepLessonPilotContent {
                 id: "lesson-3-recall-var",
                 prompt: "Why does count = 2 work after var count = 1?",
                 choices: [
-                    "var allows the existing binding to receive a new value",
                     "Every number can change even when stored with let",
+                    "var allows the existing binding to receive a new value",
                     "print changes count automatically"
                 ],
-                correctChoiceIndex: 0,
+                correctChoiceIndex: 1,
                 explanation: "var declares count as mutable, so a later assignment may replace its current value.",
                 conceptIDs: [
                     "lesson-3-mutable-binding",
