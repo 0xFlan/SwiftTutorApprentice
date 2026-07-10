@@ -18,6 +18,8 @@ struct LessonWorkspace: View {
 
     @State private var activeLessonStage: ActiveLessonStage?
     @State private var scheduledDeepLessonTask: Task<Void, Never>?
+    @State private var hasHandledInitialAutomaticPresentation = false
+    @State private var hasDeferredAutomaticPresentation = false
 
     /// Which single panel to show when the window is too narrow for 3 columns.
     private enum Panel: String, CaseIterable, Identifiable {
@@ -106,20 +108,16 @@ struct LessonWorkspace: View {
             }
         }
         .onAppear {
-            scheduleAutomaticDeepLesson(for: model.selectedLessonID)
+            handleInitialAutomaticPresentationIfNeeded()
         }
         .onChange(of: model.selectedLessonID) { _, lessonID in
             handleLessonSelectionChange(to: lessonID)
         }
         .onChange(of: canPresentLearningStages) { _, isAllowed in
-            if isAllowed {
-                scheduleAutomaticDeepLesson(for: model.selectedLessonID)
-            } else {
-                cancelScheduledDeepLesson()
-            }
+            handleLearningStageGateChange(isAllowed: isAllowed)
         }
         .onDisappear {
-            cancelScheduledDeepLesson()
+            cancelAutomaticPresentationRequest()
             activeLessonStage = nil
         }
         .sheet(item: $activeLessonStage) { stage in
@@ -340,13 +338,13 @@ struct LessonWorkspace: View {
     }
 
     private func openDeepLessonManually() {
-        cancelScheduledDeepLesson()
+        cancelAutomaticPresentationRequest()
         guard let presentation = currentStagePresentation() else { return }
         activeLessonStage = .deepLesson(presentation)
     }
 
     private func openModifyManually() {
-        cancelScheduledDeepLesson()
+        cancelAutomaticPresentationRequest()
         guard let presentation = currentStagePresentation() else { return }
         activeLessonStage = .modify(presentation)
     }
@@ -354,7 +352,46 @@ struct LessonWorkspace: View {
     private func handleLessonSelectionChange(to lessonID: Int) {
         cancelScheduledDeepLesson()
         activeLessonStage = nil
-        scheduleAutomaticDeepLesson(for: lessonID)
+
+        if canPresentLearningStages {
+            hasDeferredAutomaticPresentation = false
+            scheduleAutomaticDeepLesson(for: lessonID)
+        } else {
+            hasDeferredAutomaticPresentation = true
+        }
+    }
+
+    private func handleInitialAutomaticPresentationIfNeeded() {
+        guard !hasHandledInitialAutomaticPresentation,
+              canPresentLearningStages
+        else {
+            return
+        }
+
+        hasHandledInitialAutomaticPresentation = true
+        hasDeferredAutomaticPresentation = false
+        scheduleAutomaticDeepLesson(for: model.selectedLessonID)
+    }
+
+    private func handleLearningStageGateChange(isAllowed: Bool) {
+        guard isAllowed else {
+            if scheduledDeepLessonTask != nil {
+                hasDeferredAutomaticPresentation = true
+            }
+            cancelScheduledDeepLesson()
+            return
+        }
+
+        if !hasHandledInitialAutomaticPresentation {
+            hasHandledInitialAutomaticPresentation = true
+            hasDeferredAutomaticPresentation = false
+            scheduleAutomaticDeepLesson(for: model.selectedLessonID)
+            return
+        }
+
+        guard hasDeferredAutomaticPresentation else { return }
+        hasDeferredAutomaticPresentation = false
+        scheduleAutomaticDeepLesson(for: model.selectedLessonID)
     }
 
     private func scheduleAutomaticDeepLesson(for lessonID: Int) {
@@ -374,8 +411,10 @@ struct LessonWorkspace: View {
         scheduledDeepLessonTask = Task { @MainActor in
             await Task.yield()
 
-            guard !Task.isCancelled,
-                  canPresentLearningStages,
+            guard !Task.isCancelled else { return }
+            scheduledDeepLessonTask = nil
+
+            guard canPresentLearningStages,
                   settings.hasSeenWelcome,
                   !progress.isReadOnlyForUnsupportedVersion,
                   model.selectedLessonID == lessonID,
@@ -387,7 +426,6 @@ struct LessonWorkspace: View {
                 return
             }
 
-            scheduledDeepLessonTask = nil
             activeLessonStage = .deepLesson(
                 LessonStagePresentation(
                     lesson: lesson,
@@ -401,6 +439,11 @@ struct LessonWorkspace: View {
     private func cancelScheduledDeepLesson() {
         scheduledDeepLessonTask?.cancel()
         scheduledDeepLessonTask = nil
+    }
+
+    private func cancelAutomaticPresentationRequest() {
+        cancelScheduledDeepLesson()
+        hasDeferredAutomaticPresentation = false
     }
 }
 
