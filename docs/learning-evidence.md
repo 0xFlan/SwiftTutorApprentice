@@ -84,8 +84,9 @@ a claim that the app itself has measured learning effects.
 3. Explicit Modify stage — pilot implemented for built-in Lessons 1–3; full
    curriculum coverage remains deferred
 4. Per-concept proficiency + fadeable scaffolds (expertise reversal)
-5. Spaced varied-cue review mode
-6. Inline glossary auto-linking + prerequisite gating (CLT)
+5. Spaced varied-cue review mode — deferred beyond Deep Lesson Pilot v1
+6. Inline glossary auto-linking + prerequisite gating (CLT) — deferred beyond
+   Deep Lesson Pilot v1
 
 _Split votes (2-1) and single-study / non-programming caveats are noted per
 finding; treat exact effect sizes as indicative, not definitive._
