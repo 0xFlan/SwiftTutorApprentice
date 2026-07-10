@@ -79,10 +79,10 @@ struct SyntaxMicroscopeView: View {
         }
         .padding(.vertical, 14)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(token.display))
-        .accessibilityValue(
+        .accessibilityLabel(
             Text(
-                "\(token.role). \(token.requirement.label). "
+                "\(token.display). Role: \(token.role). "
+                + "Requirement: \(token.requirement.label). "
                 + "\(token.explanation). If you change it: \(token.ifChanged)"
             )
         )
