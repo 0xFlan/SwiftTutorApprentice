@@ -111,9 +111,12 @@ struct LessonWorkspace: View {
         .onChange(of: model.selectedLessonID) { _, lessonID in
             handleLessonSelectionChange(to: lessonID)
         }
-        .onChange(of: canPresentLearningStages) { wasAllowed, isAllowed in
-            guard !wasAllowed, isAllowed else { return }
-            scheduleAutomaticDeepLesson(for: model.selectedLessonID)
+        .onChange(of: canPresentLearningStages) { _, isAllowed in
+            if isAllowed {
+                scheduleAutomaticDeepLesson(for: model.selectedLessonID)
+            } else {
+                cancelScheduledDeepLesson()
+            }
         }
         .onDisappear {
             cancelScheduledDeepLesson()

@@ -20,7 +20,7 @@ struct ContentView: View {
     @State private var showingLessonEditor = false
     @State private var showingSettings = false
     @State private var showingWelcome = false
-    @State private var welcomePresentationIsComplete = false
+    @State private var canPresentLearningStages = false
 
     var body: some View {
         NavigationSplitView {
@@ -28,29 +28,35 @@ struct ContentView: View {
                 model: model,
                 store: model.store,
                 progress: model.progress,
-                onManageLessons: { showingLessonEditor = true },
-                onOpenSettings: { showingSettings = true }
+                onManageLessons: {
+                    canPresentLearningStages = false
+                    showingLessonEditor = true
+                },
+                onOpenSettings: {
+                    canPresentLearningStages = false
+                    showingSettings = true
+                }
             )
         } detail: {
             LessonWorkspace(
                 model: model,
                 settings: model.settings,
                 progress: model.progress,
-                canPresentLearningStages: welcomePresentationIsComplete
+                canPresentLearningStages: canPresentLearningStages
             )
                 .navigationTitle("SwiftTutor Apprentice")
                 .navigationSubtitle("Lesson \(model.currentDisplayNumber): \(model.currentLesson.title)")
         }
         .frame(minWidth: 680, minHeight: 520)
-        // First-run welcome / onboarding. Learning-stage sheets are gated on
-        // this sheet's actual dismissal, not just the persisted welcome flag.
+        // Parent sheets own the learning-stage lifecycle gate. Stage sheets
+        // resume only after the active parent sheet has actually dismissed.
         .onAppear {
             let needsWelcome = !model.settings.hasSeenWelcome
+            canPresentLearningStages = !needsWelcome
             showingWelcome = needsWelcome
-            welcomePresentationIsComplete = !needsWelcome
         }
         .sheet(isPresented: $showingWelcome, onDismiss: {
-            welcomePresentationIsComplete = true
+            canPresentLearningStages = true
         }) {
             WelcomeView(onStart: {
                 model.settings.hasSeenWelcome = true
@@ -59,11 +65,15 @@ struct ContentView: View {
             .interactiveDismissDisabled()
         }
         // The in-app lesson editor: create/edit/reorder/delete lessons.
-        .sheet(isPresented: $showingLessonEditor) {
+        .sheet(isPresented: $showingLessonEditor, onDismiss: {
+            canPresentLearningStages = true
+        }) {
             LessonEditorView(store: model.store, initialSelection: model.selectedLessonID)
         }
         // In-app settings (including the optional AI coach).
-        .sheet(isPresented: $showingSettings) {
+        .sheet(isPresented: $showingSettings, onDismiss: {
+            canPresentLearningStages = true
+        }) {
             SettingsView(settings: model.settings)
         }
         // If lessons changed while editing, keep the selection valid.
