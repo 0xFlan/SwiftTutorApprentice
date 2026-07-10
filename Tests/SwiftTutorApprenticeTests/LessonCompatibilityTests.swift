@@ -136,6 +136,7 @@ final class LessonCompatibilityTests: XCTestCase {
 
         XCTAssertFalse(decoded.hasUnsupportedDeepContent)
         XCTAssertNil(content.provenance)
+        XCTAssertEqual(content.schemaVersion, 1)
         XCTAssertEqual(content.title, "Legacy authored explanation")
 
         let encoded = try JSONEncoder().encode(decoded)
@@ -143,12 +144,35 @@ final class LessonCompatibilityTests: XCTestCase {
         XCTAssertEqual(roundTripped.deepContent, content)
         XCTAssertFalse(roundTripped.hasUnsupportedDeepContent)
         XCTAssertNil(roundTripped.deepContent?.provenance)
+        XCTAssertEqual(roundTripped.deepContent?.schemaVersion, 1)
 
         let object = try XCTUnwrap(
             JSONSerialization.jsonObject(with: encoded) as? [String: Any]
         )
         let deepContent = try XCTUnwrap(object["deepContent"] as? [String: Any])
         XCTAssertNil(deepContent["provenance"])
+        XCTAssertEqual(deepContent["schemaVersion"] as? Int, 1)
+    }
+
+    func testFutureDeepContentSchemaWithAdditiveKeyIsUnsupported() throws {
+        let data = try lessonDataWithDeepContentSchemaVersion(
+            2,
+            additiveKey: ("futureInteractiveLab", ["steps": ["new step"]])
+        )
+
+        let decoded = try JSONDecoder().decode(Lesson.self, from: data)
+
+        XCTAssertNil(decoded.deepContent)
+        XCTAssertTrue(decoded.hasUnsupportedDeepContent)
+    }
+
+    func testMalformedDeepContentSchemaVersionIsUnsupported() throws {
+        let data = try lessonDataWithDeepContentSchemaVersion("version two")
+
+        let decoded = try JSONDecoder().decode(Lesson.self, from: data)
+
+        XCTAssertNil(decoded.deepContent)
+        XCTAssertTrue(decoded.hasUnsupportedDeepContent)
     }
 
     func testLessonWithDeepContentRoundTrips() throws {
@@ -219,6 +243,7 @@ final class LessonCompatibilityTests: XCTestCase {
 
         XCTAssertEqual(decoded, lesson)
         XCTAssertEqual(decoded.deepContent, content)
+        XCTAssertEqual(decoded.deepContent?.schemaVersion, 1)
         XCTAssertEqual(
             decoded.deepContent?.provenance,
             LessonDeepContentProvenance(source: .bundled, revision: 1)
@@ -229,6 +254,8 @@ final class LessonCompatibilityTests: XCTestCase {
             JSONSerialization.jsonObject(with: encoded) as? [String: Any]
         )
         XCTAssertNil(object["hasUnsupportedDeepContent"])
+        let encodedDeepContent = try XCTUnwrap(object["deepContent"] as? [String: Any])
+        XCTAssertEqual(encodedDeepContent["schemaVersion"] as? Int, 1)
     }
 
     private func legacyLessonsFixtureData() throws -> Data {
@@ -245,6 +272,26 @@ final class LessonCompatibilityTests: XCTestCase {
     private func lessonData(id: Int, deepContent: Any? = nil) throws -> Data {
         try JSONSerialization.data(
             withJSONObject: [lessonJSONObject(id: id, deepContent: deepContent)]
+        )
+    }
+
+    private func lessonDataWithDeepContentSchemaVersion(
+        _ schemaVersion: Any,
+        additiveKey: (String, Any)? = nil
+    ) throws -> Data {
+        let encoded = try JSONEncoder().encode(Curriculum.defaultLessons[0])
+        var lesson = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        var deepContent = try XCTUnwrap(lesson["deepContent"] as? [String: Any])
+        deepContent["schemaVersion"] = schemaVersion
+        if let additiveKey {
+            deepContent[additiveKey.0] = additiveKey.1
+        }
+        lesson["deepContent"] = deepContent
+        return try JSONSerialization.data(
+            withJSONObject: lesson,
+            options: [.prettyPrinted, .sortedKeys]
         )
     }
 

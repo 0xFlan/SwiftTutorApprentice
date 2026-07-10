@@ -88,6 +88,23 @@ extension Lesson {
              successMessage, hint, kind, deepContent
     }
 
+    private struct DeepContentSchemaEnvelope: Decodable {
+        let schemaVersion: Int
+
+        private enum CodingKeys: String, CodingKey {
+            case schemaVersion
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            if c.contains(.schemaVersion) {
+                schemaVersion = try c.decode(Int.self, forKey: .schemaVersion)
+            } else {
+                schemaVersion = LessonDeepContent.currentSchemaVersion
+            }
+        }
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(Int.self, forKey: .id)
@@ -111,6 +128,15 @@ extension Lesson {
             hasUnsupportedDeepContent = false
         } else {
             do {
+                let envelope = try c.decode(
+                    DeepContentSchemaEnvelope.self,
+                    forKey: .deepContent
+                )
+                guard envelope.schemaVersion == LessonDeepContent.currentSchemaVersion else {
+                    deepContent = nil
+                    hasUnsupportedDeepContent = true
+                    return
+                }
                 deepContent = try c.decode(LessonDeepContent.self, forKey: .deepContent)
                 hasUnsupportedDeepContent = false
             } catch {

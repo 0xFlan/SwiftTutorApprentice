@@ -27,6 +27,7 @@ final class LessonStore: ObservableObject {
 
     private let fileURL: URL
     private let defaults: [Lesson]
+    private static let baselineSupportedBundledRevision = 1
 
     private static var defaultFileURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -116,7 +117,9 @@ final class LessonStore: ObservableObject {
         }
         lessons = decoded
 
-        if decoded.contains(where: \.hasUnsupportedDeepContent) {
+        if decoded.contains(where: \.hasUnsupportedDeepContent)
+            || decoded.contains(where: hasNewerBundledDeepContent)
+        {
             isReadOnlyForUnsupportedDeepContent = true
             print("LessonStore: unsupported Deep Lesson data; lesson editing is read-only")
             return
@@ -168,6 +171,29 @@ final class LessonStore: ObservableObject {
         if changed {
             save()
         }
+    }
+
+    private func hasNewerBundledDeepContent(_ lesson: Lesson) -> Bool {
+        guard let provenance = lesson.deepContent?.provenance,
+              provenance.source == .bundled
+        else {
+            return false
+        }
+
+        return provenance.revision > supportedBundledRevision(for: lesson.id)
+    }
+
+    private func supportedBundledRevision(for lessonID: Int) -> Int {
+        guard let defaultProvenance = defaults
+            .first(where: { $0.id == lessonID })?
+            .deepContent?
+            .provenance,
+              defaultProvenance.source == .bundled
+        else {
+            return Self.baselineSupportedBundledRevision
+        }
+
+        return max(Self.baselineSupportedBundledRevision, defaultProvenance.revision)
     }
 
     private func reconcilingBundledDeepContent(in lesson: Lesson) -> Lesson {

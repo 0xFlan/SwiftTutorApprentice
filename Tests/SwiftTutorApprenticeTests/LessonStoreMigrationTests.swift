@@ -175,7 +175,7 @@ final class LessonStoreMigrationTests: XCTestCase {
         XCTAssertNil(try readLessons()[0].deepContent)
     }
 
-    func testNewerSavedBundledRevisionIsNeverDowngraded() throws {
+    func testNewerSavedBundledRevisionMakesStoreReadOnlyWithoutDowngradingBytes() throws {
         var currentDefault = Curriculum.defaultLessons[0]
         currentDefault.deepContent = pilotDeepContent(
             title: "Current app content",
@@ -186,12 +186,14 @@ final class LessonStoreMigrationTests: XCTestCase {
             title: "Newer saved content",
             provenance: bundledProvenance(revision: 3)
         )
-        try writeLessons([newerSavedLesson])
+        let secondSavedLesson = Curriculum.defaultLessons[1]
+        let missingDefault = Curriculum.defaultLessons[2]
+        let originalData = try JSONEncoder().encode([newerSavedLesson, secondSavedLesson])
 
-        let store = LessonStore(fileURL: fixtureURL, defaults: [currentDefault])
-
-        XCTAssertEqual(store.lessons[0], newerSavedLesson)
-        XCTAssertEqual(try readLessons()[0], newerSavedLesson)
+        try assertReadOnlyStorePreservesEveryByte(
+            originalData,
+            defaults: [currentDefault, secondSavedLesson, missingDefault]
+        )
     }
 
     func testAddRemovesIncompatibleBundledContentBeforePersisting() throws {
@@ -235,31 +237,27 @@ final class LessonStoreMigrationTests: XCTestCase {
         let store = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
         XCTAssertEqual(store.lessons[0].deepContent?.provenance, bundledProvenance)
 
-        var editedLesson = store.lessons[0]
-        editedLesson.title = "Keep this learner title"
-        editedLesson.starterCode = "print(\"Learner exercise\")"
-        let normalized = try XCTUnwrap(store.update(editedLesson))
+        var draftState = LessonEditorDraftState(draft: store.lessons[0])
+        draftState.draft.title = "Keep this learner title"
+        draftState.draft.starterCode = "print(\"Learner exercise\")"
+        XCTAssertTrue(
+            draftState.hasUnsavedChanges(comparedTo: store.lesson(id: draftState.draft.id))
+        )
+
+        let normalized = try XCTUnwrap(draftState.commit(to: store))
 
         XCTAssertEqual(store.lessons[0].title, "Keep this learner title")
         XCTAssertNil(store.lessons[0].deepContent)
-        XCTAssertEqual(normalized, store.lesson(id: editedLesson.id))
+        XCTAssertEqual(normalized, draftState.draft)
+        XCTAssertEqual(normalized, store.lesson(id: draftState.draft.id))
         XCTAssertEqual(normalized, try readLessons()[0])
-        XCTAssertTrue(
-            LessonEditorView.hasUnsavedChanges(
-                storedVersion: normalized,
-                draft: editedLesson
-            )
-        )
         XCTAssertFalse(
-            LessonEditorView.hasUnsavedChanges(
-                storedVersion: normalized,
-                draft: normalized
-            )
+            draftState.hasUnsavedChanges(comparedTo: store.lesson(id: draftState.draft.id))
         )
         XCTAssertNil(try readLessons()[0].deepContent)
 
         let reopened = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
-        XCTAssertEqual(reopened.lesson(id: editedLesson.id), normalized)
+        XCTAssertEqual(reopened.lesson(id: draftState.draft.id), normalized)
         XCTAssertEqual(reopened.lessons[0].title, "Keep this learner title")
         XCTAssertEqual(reopened.lessons[0].starterCode, "print(\"Learner exercise\")")
         XCTAssertNil(reopened.lessons[0].deepContent)
@@ -386,6 +384,59 @@ final class LessonStoreMigrationTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: fixtureURL), originalData)
     }
 
+    func testFutureDeepContentSchemaMakesStoreGloballyReadOnlyAndPreservesEveryByte() throws {
+        let firstSavedLesson = Curriculum.defaultLessons[0]
+        let secondSavedLesson = Curriculum.defaultLessons[1]
+        let missingDefault = Curriculum.defaultLessons[2]
+        let originalData = try encodedLessonsWithFutureDeepContentSchema(
+            [firstSavedLesson, secondSavedLesson]
+        )
+
+        try assertReadOnlyStorePreservesEveryByte(
+            originalData,
+            defaults: [firstSavedLesson, secondSavedLesson, missingDefault]
+        )
+    }
+
+    func testNewerBundledRevisionWithIncompatibleStarterIsReadOnlyBeforeReconciliation() throws {
+        let currentDefault = Curriculum.defaultLessons[0]
+        var futureRevisionLesson = currentDefault
+        futureRevisionLesson.starterCode = "print(\"Future custom starter\")"
+        futureRevisionLesson.deepContent = pilotDeepContent(
+            title: "Future bundled revision",
+            provenance: bundledProvenance(revision: 2)
+        )
+        let secondSavedLesson = Curriculum.defaultLessons[1]
+        let missingDefault = Curriculum.defaultLessons[2]
+        let originalData = try JSONEncoder().encode(
+            [futureRevisionLesson, secondSavedLesson]
+        )
+
+        try assertReadOnlyStorePreservesEveryByte(
+            originalData,
+            defaults: [currentDefault, secondSavedLesson, missingDefault]
+        )
+    }
+
+    func testNewerBundledRevisionWithoutMatchingDefaultIsReadOnlyBeforeRemoval() throws {
+        var futureRevisionLesson = Curriculum.defaultLessons[0]
+        futureRevisionLesson.id = 9_301
+        futureRevisionLesson.deepContent = pilotDeepContent(
+            title: "Future orphaned bundled revision",
+            provenance: bundledProvenance(revision: 2)
+        )
+        let secondSavedLesson = Curriculum.defaultLessons[1]
+        let missingDefault = Curriculum.defaultLessons[2]
+        let originalData = try JSONEncoder().encode(
+            [futureRevisionLesson, secondSavedLesson]
+        )
+
+        try assertReadOnlyStorePreservesEveryByte(
+            originalData,
+            defaults: [secondSavedLesson, missingDefault]
+        )
+    }
+
     func testMissingDefaultIsAppendedOnceAndExistingOrderIsPreservedAcrossReopen() throws {
         let firstStockLesson = Curriculum.defaultLessons[0]
         let missingStockLesson = Curriculum.defaultLessons[1]
@@ -494,6 +545,60 @@ final class LessonStoreMigrationTests: XCTestCase {
             withJSONObject: array,
             options: [.prettyPrinted, .sortedKeys]
         )
+    }
+
+    private func encodedLessonsWithFutureDeepContentSchema(
+        _ lessons: [Lesson]
+    ) throws -> Data {
+        let encoded = try JSONEncoder().encode(lessons)
+        var array = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [[String: Any]]
+        )
+        var deepContent = try XCTUnwrap(array[0]["deepContent"] as? [String: Any])
+        deepContent["schemaVersion"] = 2
+        deepContent["futureInteractiveLab"] = ["steps": ["new step"]]
+        array[0]["deepContent"] = deepContent
+        return try JSONSerialization.data(
+            withJSONObject: array,
+            options: [.prettyPrinted, .sortedKeys]
+        )
+    }
+
+    private func assertReadOnlyStorePreservesEveryByte(
+        _ originalData: Data,
+        defaults: [Lesson]
+    ) throws {
+        try originalData.write(to: fixtureURL, options: .atomic)
+        let store = LessonStore(fileURL: fixtureURL, defaults: defaults)
+        let safelyDecodedLessons = store.lessons
+        XCTAssertGreaterThanOrEqual(safelyDecodedLessons.count, 2)
+
+        func assertUnchanged() throws {
+            XCTAssertEqual(store.lessons, safelyDecodedLessons)
+            XCTAssertEqual(try Data(contentsOf: fixtureURL), originalData)
+        }
+
+        XCTAssertTrue(store.isReadOnlyForUnsupportedDeepContent)
+        try assertUnchanged()
+
+        var addedLesson = try XCTUnwrap(defaults.last)
+        addedLesson.id = 99_901
+        store.add(addedLesson)
+        try assertUnchanged()
+
+        var updatedLesson = safelyDecodedLessons[1]
+        updatedLesson.title = "This update must stay blocked"
+        XCTAssertNil(store.update(updatedLesson))
+        try assertUnchanged()
+
+        store.delete(id: safelyDecodedLessons[1].id)
+        try assertUnchanged()
+
+        store.move(id: safelyDecodedLessons[0].id, by: 1)
+        try assertUnchanged()
+
+        store.restoreDefaults()
+        try assertUnchanged()
     }
 
     private func pilotDeepContent(
