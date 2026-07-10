@@ -68,10 +68,21 @@ This file grounds the app's pedagogy in evidence and sequences the roadmap.
 - **Interleaving** and **deliberate practice** — named in the query but produced
   no surviving verified claims; this pass can't speak to them for novice coding.
 
+## Current pilot alignment
+
+The built-in Lessons 1–3 pilot is a bounded application of the rationale above.
+Its concept-first segments, working examples, wrong variants, Syntax Microscope,
+and recall map to PRIMM's Investigate phase before the guided Modify task. Short
+one-concept segments and explicit **Required by Swift** / **Convention** /
+**Depends on context** labels apply the documented cognitive-load rationale
+around terminology and extraneous load. This is an implementation mapping, not
+a claim that the app itself has measured learning effects.
+
 ## Roadmap (evidence-ranked)
 1. Parsons practice mode ← in progress
 2. Explain-the-bug / self-explanation prompts with stored feedback
-3. Explicit Modify stage (guided edit of working code)
+3. Explicit Modify stage — pilot implemented for built-in Lessons 1–3; full
+   curriculum coverage remains deferred
 4. Per-concept proficiency + fadeable scaffolds (expertise reversal)
 5. Spaced varied-cue review mode
 6. Inline glossary auto-linking + prerequisite gating (CLT)
