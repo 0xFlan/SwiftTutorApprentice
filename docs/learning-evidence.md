@@ -11,10 +11,10 @@ This file grounds the app's pedagogy in evidence and sequences the roadmap.
    experiment, 493 students aged 11–14 across 13 schools, PRIMM group beat
    control on a programming post-test. *Source: Sentance, Waite & Kallia 2019
    (ERIC EJ1217966).*
-   - **App fit:** already have Predict, Run, and (via the walkthrough)
-     Investigate. Add explicit **Modify** (hand the learner working code +
-     one guided change) and reserve free-coding (**Make**) for last. Consider
-     making a prediction expected before running.
+   - **App fit:** Predict and Run are implemented, and the walkthrough supports
+     Investigate. Built-in Lessons 1–3 now pilot explicit **Modify** by handing
+     the learner working code plus one guided change and an output prediction.
+     Free-coding (**Make**) remains a later step.
 
 2. **Parsons problems (arrange scrambled code lines)** — ~30% faster practice
    than fixing/writing code with no learning loss (473s vs 679s; F(2,133)=10.8,
@@ -23,25 +23,27 @@ This file grounds the app's pedagogy in evidence and sequences the roadmap.
    reading worked examples to writing code. **Start WITHOUT distractors** for
    absolute beginners (Harms et al.: distractors cut novice efficiency ~26%).
    *Sources: Ericson, Margulieux & Rick 2017 (Koli Calling); arXiv 2311.18115.*
-   - **App fit:** a Parsons practice mode, auto-derived by splitting a lesson's
-     starter code into lines and scrambling them. Optional scaffold before the
-     blank editor. **← building first.**
+   - **App fit:** the Parsons baseline is implemented for eligible multi-line
+     lessons: it splits and scrambles starter-code lines as an optional scaffold
+     before the editor.
 
 3. **Self-explanation / bug-finding with immediate feedback** — explaining why
    a "classmate's" buggy code fails and how to fix it produced significant
    real-course gains (+1.7 to +2.4 on a 0–10 scale vs +0.6 control); guided
    self-explanation questions beat instructor-given explanations on transfer
    without adding cognitive load. *Sources: JISE 2024 v35n3; ACM 10.1145/3732791.*
-   - **App fit:** extend the coach with "explain-the-bug" problems (buggy code +
-     output → learner explains → reveal stored explanation), and attach guided
-     "why is this line needed?" questions to the walkthrough.
+   - **App fit:** the Find the bug baseline is implemented for injectable code
+     lessons: the learner explains an injected mistake, then reveals stored
+     feedback or loads the broken code into the editor. Guided "why is this line
+     needed?" walkthrough questions remain a possible enhancement.
 
 4. **Cognitive Load Theory** — keep intrinsic load appropriate, minimise
    extraneous load; unfamiliar terminology itself raises load for novices.
    *Source: PMC12246501.*
-   - **App fit:** inline tap-to-define glossary on first use (have the glossary;
-     could auto-link terms in lesson text), spare novice UI, prerequisite-gated
-     one-concept microlessons.
+   - **App fit:** the inline tap-to-define glossary is implemented. Automatic
+     term linking and prerequisite-gated one-concept microlessons are deferred
+     beyond Deep Lesson Pilot v1; keeping the novice UI spare remains a design
+     goal.
 
 5. **Expertise-reversal / faded worked examples** — support that helps novices
    *harms* more advanced learners (meta-analysis: low-prior-knowledge d=+0.505
@@ -79,13 +81,15 @@ around terminology and extraneous load. This is an implementation mapping, not
 a claim that the app itself has measured learning effects.
 
 ## Roadmap (evidence-ranked)
-1. Parsons practice mode ← in progress
-2. Explain-the-bug / self-explanation prompts with stored feedback
-3. Explicit Modify stage — pilot implemented for built-in Lessons 1–3; full
+1. **Implemented:** Parsons practice for eligible multi-line lessons
+2. **Implemented:** Find the bug / self-explanation baseline for injectable code
+   lessons
+3. **Pilot implemented:** Explicit Modify for built-in Lessons 1–3; full
    curriculum coverage remains deferred
-4. Per-concept proficiency + fadeable scaffolds (expertise reversal)
-5. Spaced varied-cue review mode — deferred beyond Deep Lesson Pilot v1
-6. Inline glossary auto-linking + prerequisite gating (CLT) — deferred beyond
+4. **Deferred:** Per-concept proficiency + fadeable scaffolds (expertise
+   reversal)
+5. **Deferred:** Spaced varied-cue review mode beyond Deep Lesson Pilot v1
+6. **Deferred:** Inline glossary auto-linking + prerequisite gating (CLT) beyond
    Deep Lesson Pilot v1
 
 _Split votes (2-1) and single-study / non-programming caveats are noted per
