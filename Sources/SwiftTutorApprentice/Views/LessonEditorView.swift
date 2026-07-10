@@ -24,7 +24,16 @@ struct LessonEditorView: View {
 
     /// The saved version of whatever we're editing (nil if it's brand new).
     private var storedVersion: Lesson? { store.lesson(id: draft.id) }
-    private var hasUnsavedChanges: Bool { storedVersion != draft }
+    private var hasUnsavedChanges: Bool {
+        Self.hasUnsavedChanges(storedVersion: storedVersion, draft: draft)
+    }
+
+    nonisolated static func hasUnsavedChanges(
+        storedVersion: Lesson?,
+        draft: Lesson
+    ) -> Bool {
+        storedVersion != draft
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -268,8 +277,8 @@ struct LessonEditorView: View {
     // MARK: - Actions
 
     private func commitDraft() {
-        if store.lesson(id: draft.id) != nil {
-            store.update(draft)
+        if let normalizedLesson = store.update(draft) {
+            draft = normalizedLesson
         }
     }
 

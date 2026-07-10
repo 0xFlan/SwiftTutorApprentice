@@ -73,6 +73,84 @@ final class LessonCompatibilityTests: XCTestCase {
         }
     }
 
+    func testLegacyDeepContentWithoutProvenanceRemainsValidCustomContentOnRoundTrip() throws {
+        let data = Data(
+            #"""
+            {
+              "id": 74,
+              "title": "Legacy deep lesson",
+              "goal": "Preserve authored content",
+              "starterCode": "print(\"Legacy\")",
+              "teaches": ["print"],
+              "glossaryTerms": ["String"],
+              "syntaxTokens": [],
+              "syntaxWhy": "Legacy syntax explanation",
+              "expectedOutput": "Legacy",
+              "successMarkers": ["print("],
+              "successMessage": "Legacy success",
+              "hint": "Legacy hint",
+              "deepContent": {
+                "title": "Legacy authored explanation",
+                "introduction": "This predates provenance.",
+                "segments": [{
+                  "id": "legacy-segment",
+                  "title": "Legacy segment",
+                  "explanation": "Explain the legacy call.",
+                  "correctCode": "print(\"Legacy\")",
+                  "wrongCode": null,
+                  "wrongExplanation": null
+                }],
+                "microscopeTokens": [{
+                  "id": "legacy-token",
+                  "display": "print",
+                  "role": "Call a function",
+                  "requirement": "required",
+                  "explanation": "The function writes output.",
+                  "ifChanged": "A different name changes the call."
+                }],
+                "modifyTask": {
+                  "id": "legacy-modify",
+                  "prompt": "Change the message.",
+                  "starterCode": "print(\"Legacy\")",
+                  "expectedCode": "print(\"Custom\")",
+                  "predictionPrompt": "What prints?",
+                  "expectedOutput": "Custom",
+                  "successExplanation": "The custom text prints.",
+                  "conceptIDs": ["legacy-print"]
+                },
+                "recallQuestions": [{
+                  "id": "legacy-recall",
+                  "prompt": "What writes output?",
+                  "choices": ["print", "let"],
+                  "correctChoiceIndex": 0,
+                  "explanation": "print writes output.",
+                  "conceptIDs": ["legacy-print"]
+                }]
+              }
+            }
+            """#.utf8
+        )
+
+        let decoded = try JSONDecoder().decode(Lesson.self, from: data)
+        let content = try XCTUnwrap(decoded.deepContent)
+
+        XCTAssertFalse(decoded.hasUnsupportedDeepContent)
+        XCTAssertNil(content.provenance)
+        XCTAssertEqual(content.title, "Legacy authored explanation")
+
+        let encoded = try JSONEncoder().encode(decoded)
+        let roundTripped = try JSONDecoder().decode(Lesson.self, from: encoded)
+        XCTAssertEqual(roundTripped.deepContent, content)
+        XCTAssertFalse(roundTripped.hasUnsupportedDeepContent)
+        XCTAssertNil(roundTripped.deepContent?.provenance)
+
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        let deepContent = try XCTUnwrap(object["deepContent"] as? [String: Any])
+        XCTAssertNil(deepContent["provenance"])
+    }
+
     func testLessonWithDeepContentRoundTrips() throws {
         let content = LessonDeepContent(
             title: "Printing in detail",

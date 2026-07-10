@@ -62,16 +62,19 @@ final class LessonStore: ObservableObject {
     /// Add a brand-new lesson to the end.
     func add(_ lesson: Lesson) {
         guard !isReadOnlyForUnsupportedDeepContent else { return }
-        lessons.append(lesson)
+        lessons.append(reconcilingBundledDeepContent(in: lesson))
         save()
     }
 
     /// Replace an existing lesson (matched by id) with an edited version.
-    func update(_ lesson: Lesson) {
-        guard !isReadOnlyForUnsupportedDeepContent else { return }
-        guard let index = lessons.firstIndex(where: { $0.id == lesson.id }) else { return }
-        lessons[index] = invalidatingBundledDeepContentIfNeeded(in: lesson)
+    @discardableResult
+    func update(_ lesson: Lesson) -> Lesson? {
+        guard !isReadOnlyForUnsupportedDeepContent else { return nil }
+        guard let index = lessons.firstIndex(where: { $0.id == lesson.id }) else { return nil }
+        let reconciledLesson = reconcilingBundledDeepContent(in: lesson)
+        lessons[index] = reconciledLesson
         save()
+        return reconciledLesson
     }
 
     /// Delete a lesson by id. Won't delete the last remaining lesson.
@@ -134,11 +137,12 @@ final class LessonStore: ObservableObject {
         var changed = false
 
         for index in lessons.indices {
-            let compatibleLesson = invalidatingBundledDeepContentIfNeeded(
-                in: lessons[index]
+            let savedLessonBeforeReconciliation = lessons[index]
+            let reconciledLesson = reconcilingBundledDeepContent(
+                in: savedLessonBeforeReconciliation
             )
-            if compatibleLesson != lessons[index] {
-                lessons[index] = compatibleLesson
+            if reconciledLesson != savedLessonBeforeReconciliation {
+                lessons[index] = reconciledLesson
                 changed = true
             }
 
@@ -146,6 +150,7 @@ final class LessonStore: ObservableObject {
             guard let defaultLesson = defaults.first(where: { $0.id == savedLesson.id }),
                   defaultLesson.kind == savedLesson.kind,
                   defaultLesson.starterCode == savedLesson.starterCode,
+                  savedLessonBeforeReconciliation.deepContent == nil,
                   savedLesson.deepContent == nil,
                   let deepContent = defaultLesson.deepContent
             else { continue }
@@ -165,21 +170,33 @@ final class LessonStore: ObservableObject {
         }
     }
 
-    private func invalidatingBundledDeepContentIfNeeded(in lesson: Lesson) -> Lesson {
-        guard lesson.deepContent?.provenance?.source == .bundled else {
+    private func reconcilingBundledDeepContent(in lesson: Lesson) -> Lesson {
+        guard let savedDeepContent = lesson.deepContent,
+              let savedProvenance = savedDeepContent.provenance,
+              savedProvenance.source == .bundled
+        else {
             return lesson
         }
 
         guard let defaultLesson = defaults.first(where: { $0.id == lesson.id }),
               defaultLesson.kind == lesson.kind,
-              defaultLesson.starterCode == lesson.starterCode
+              defaultLesson.starterCode == lesson.starterCode,
+              let defaultDeepContent = defaultLesson.deepContent,
+              let defaultProvenance = defaultDeepContent.provenance,
+              defaultProvenance.source == .bundled
         else {
-            var invalidatedLesson = lesson
-            invalidatedLesson.deepContent = nil
-            return invalidatedLesson
+            var reconciledLesson = lesson
+            reconciledLesson.deepContent = nil
+            return reconciledLesson
         }
 
-        return lesson
+        guard savedProvenance.revision <= defaultProvenance.revision else {
+            return lesson
+        }
+
+        var reconciledLesson = lesson
+        reconciledLesson.deepContent = defaultDeepContent
+        return reconciledLesson
     }
 
     private func save() {
