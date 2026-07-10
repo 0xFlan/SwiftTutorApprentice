@@ -10,11 +10,13 @@ import SwiftUI
 struct ModifyTaskView: View {
     let task: ModifyTask
     let existingEditorCode: String
+    let progressCanBeSaved: Bool
     let onPassed: () -> Void
     let onReplaceEditor: (_ code: String, _ prediction: String) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @AccessibilityFocusState private var feedbackIsFocused: Bool
+    @FocusState private var codeEditorIsFocused: Bool
     @State private var code: String
     @State private var prediction = ""
     @State private var result: ModifyTaskResult?
@@ -24,11 +26,13 @@ struct ModifyTaskView: View {
     init(
         task: ModifyTask,
         existingEditorCode: String,
+        progressCanBeSaved: Bool,
         onPassed: @escaping () -> Void,
         onReplaceEditor: @escaping (_ code: String, _ prediction: String) -> Void
     ) {
         self.task = task
         self.existingEditorCode = existingEditorCode
+        self.progressCanBeSaved = progressCanBeSaved
         self.onPassed = onPassed
         self.onReplaceEditor = onReplaceEditor
         _code = State(initialValue: task.starterCode)
@@ -40,31 +44,40 @@ struct ModifyTaskView: View {
 
             Divider()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    instructions
-                    codeEditor
-                    predictionEditor
+            ScrollViewReader { scrollProxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        instructions
+                        codeEditor
+                        predictionEditor
 
-                    Button {
-                        checkChange()
-                    } label: {
-                        Label("Check my change", systemImage: "checkmark.circle")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-                    .help("Compare your code change and prediction with this task's goal")
+                        Button {
+                            checkChange(scrollProxy: scrollProxy)
+                        } label: {
+                            Label("Check my change", systemImage: "checkmark.circle")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.defaultAction)
+                        .help("Compare your code change and prediction with this task's goal")
 
-                    if let result {
-                        feedback(for: result)
+                        if let result {
+                            feedback(for: result)
+                                .id(Self.feedbackID)
+                        }
                     }
+                    .frame(maxWidth: 820, alignment: .leading)
+                    .padding(24)
+                    .frame(maxWidth: .infinity, alignment: .top)
                 }
-                .frame(maxWidth: 820, alignment: .leading)
-                .padding(24)
-                .frame(maxWidth: .infinity, alignment: .top)
             }
         }
         .frame(minWidth: 640, minHeight: 580)
+        .onAppear {
+            Task { @MainActor in
+                await Task.yield()
+                codeEditorIsFocused = true
+            }
+        }
         .onChange(of: code) {
             clearStaleResult()
         }
@@ -120,6 +133,7 @@ struct ModifyTaskView: View {
                 .font(.headline)
 
             CodeTextView(text: $code)
+                .focused($codeEditorIsFocused)
                 .frame(minHeight: 220, idealHeight: 300)
                 .overlay {
                     RoundedRectangle(cornerRadius: 6)
@@ -188,7 +202,7 @@ struct ModifyTaskView: View {
         }
     }
 
-    private func checkChange() {
+    private func checkChange(scrollProxy: ScrollViewProxy) {
         let newResult = ModifyTaskEvaluator.evaluate(
             code: code,
             prediction: prediction,
@@ -198,10 +212,15 @@ struct ModifyTaskView: View {
 
         if newResult == .passed, !hasReportedPass {
             hasReportedPass = true
-            onPassed()
+            if progressCanBeSaved {
+                onPassed()
+            }
         }
 
         Task { @MainActor in
+            withAnimation {
+                scrollProxy.scrollTo(Self.feedbackID, anchor: .center)
+            }
             feedbackIsFocused = true
         }
     }
@@ -237,7 +256,7 @@ struct ModifyTaskView: View {
         case .bothDoNotMatch:
             return "Keep working on both parts"
         case .passed:
-            return "Passed"
+            return progressCanBeSaved ? "Passed" : "Passed for this session"
         }
     }
 
@@ -250,7 +269,10 @@ struct ModifyTaskView: View {
         case .bothDoNotMatch:
             return "The code does not yet make the requested change, and the prediction does not match the expected output. Work through the prompt one part at a time."
         case .passed:
-            return task.successExplanation
+            if progressCanBeSaved {
+                return task.successExplanation
+            }
+            return "\(task.successExplanation)\n\nThis milestone was not saved because your progress file was created by a newer app version."
         }
     }
 
@@ -271,4 +293,6 @@ struct ModifyTaskView: View {
             return .orange
         }
     }
+
+    private static let feedbackID = "modify-task-feedback"
 }

@@ -14,11 +14,9 @@ struct LessonWorkspace: View {
     @ObservedObject var model: AppModel
     @ObservedObject var settings: AppSettings
     @ObservedObject var progress: ProgressStore
+    let canPresentLearningStages: Bool
 
-    @State private var showingDeepLesson = false
-    @State private var showingModify = false
-    @State private var deepLessonPresentation: LessonStagePresentation?
-    @State private var modifyPresentation: LessonStagePresentation?
+    @State private var activeLessonStage: ActiveLessonStage?
     @State private var scheduledDeepLessonTask: Task<Void, Never>?
 
     /// Which single panel to show when the window is too narrow for 3 columns.
@@ -39,6 +37,11 @@ struct LessonWorkspace: View {
 
             navigationBar
             Divider()
+
+            if progress.isReadOnlyForUnsupportedVersion {
+                readOnlyProgressBanner
+                Divider()
+            }
 
             if model.currentLesson.deepContent != nil {
                 LessonStageStepper(
@@ -108,20 +111,17 @@ struct LessonWorkspace: View {
         .onChange(of: model.selectedLessonID) { _, lessonID in
             handleLessonSelectionChange(to: lessonID)
         }
-        .onChange(of: settings.hasSeenWelcome) { wasSeen, isSeen in
-            guard !wasSeen, isSeen else { return }
-            scheduleAutomaticDeepLesson(
-                for: model.selectedLessonID,
-                delayNanoseconds: 250_000_000
-            )
+        .onChange(of: canPresentLearningStages) { wasAllowed, isAllowed in
+            guard !wasAllowed, isAllowed else { return }
+            scheduleAutomaticDeepLesson(for: model.selectedLessonID)
         }
         .onDisappear {
             cancelScheduledDeepLesson()
+            activeLessonStage = nil
         }
-        .sheet(isPresented: $showingDeepLesson, onDismiss: {
-            deepLessonPresentation = nil
-        }) {
-            if let presentation = deepLessonPresentation {
+        .sheet(item: $activeLessonStage) { stage in
+            switch stage {
+            case .deepLesson(let presentation):
                 DeepLessonView(
                     lesson: presentation.lesson,
                     content: presentation.content,
@@ -136,17 +136,11 @@ struct LessonWorkspace: View {
                         )
                     }
                 )
-            } else {
-                unavailableStageSheet
-            }
-        }
-        .sheet(isPresented: $showingModify, onDismiss: {
-            modifyPresentation = nil
-        }) {
-            if let presentation = modifyPresentation {
+            case .modify(let presentation):
                 ModifyTaskView(
                     task: presentation.content.modifyTask,
                     existingEditorCode: presentation.existingEditorCode,
+                    progressCanBeSaved: !progress.isReadOnlyForUnsupportedVersion,
                     onPassed: {
                         progress.markModifyPassed(presentation.lesson.id)
                     },
@@ -159,8 +153,6 @@ struct LessonWorkspace: View {
                         model.runResult = nil
                     }
                 )
-            } else {
-                unavailableStageSheet
             }
         }
     }
@@ -252,6 +244,30 @@ struct LessonWorkspace: View {
         .background(Color.accentColor.opacity(0.10))
     }
 
+    private var readOnlyProgressBanner: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Progress is read-only")
+                    .font(.callout.bold())
+                    .foregroundStyle(.primary)
+
+                Text("This progress file was created by a newer app version. Completion and Deep Lesson or Modify activity cannot be saved. You can still study lessons and run code.")
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.11))
+        .accessibilityElement(children: .combine)
+    }
+
     private var navigationBar: some View {
         HStack(spacing: 10) {
             Button {
@@ -305,24 +321,6 @@ struct LessonWorkspace: View {
         .animation(.easeInOut(duration: 0.2), value: progress.isComplete(model.selectedLessonID))
     }
 
-    private var unavailableStageSheet: some View {
-        VStack(spacing: 14) {
-            Label("Stage unavailable", systemImage: "exclamationmark.triangle")
-                .font(.headline)
-
-            Text("This lesson's guided content is no longer available.")
-                .foregroundStyle(.secondary)
-
-            Button("Done") {
-                showingDeepLesson = false
-                showingModify = false
-            }
-            .keyboardShortcut(.cancelAction)
-        }
-        .padding(32)
-        .frame(minWidth: 420, minHeight: 220)
-    }
-
     private func currentStagePresentation() -> LessonStagePresentation? {
         let lesson = model.currentLesson
         guard lesson.id == model.selectedLessonID,
@@ -341,56 +339,45 @@ struct LessonWorkspace: View {
     private func openDeepLessonManually() {
         cancelScheduledDeepLesson()
         guard let presentation = currentStagePresentation() else { return }
-        modifyPresentation = nil
-        showingModify = false
-        deepLessonPresentation = presentation
-        showingDeepLesson = true
+        activeLessonStage = .deepLesson(presentation)
     }
 
     private func openModifyManually() {
         cancelScheduledDeepLesson()
         guard let presentation = currentStagePresentation() else { return }
-        deepLessonPresentation = nil
-        showingDeepLesson = false
-        modifyPresentation = presentation
-        showingModify = true
+        activeLessonStage = .modify(presentation)
     }
 
     private func handleLessonSelectionChange(to lessonID: Int) {
         cancelScheduledDeepLesson()
-        showingDeepLesson = false
-        showingModify = false
-        deepLessonPresentation = nil
-        modifyPresentation = nil
+        activeLessonStage = nil
         scheduleAutomaticDeepLesson(for: lessonID)
     }
 
-    private func scheduleAutomaticDeepLesson(
-        for lessonID: Int,
-        delayNanoseconds: UInt64 = 0
-    ) {
+    private func scheduleAutomaticDeepLesson(for lessonID: Int) {
         cancelScheduledDeepLesson()
 
-        guard settings.hasSeenWelcome,
+        guard canPresentLearningStages,
+              settings.hasSeenWelcome,
+              !progress.isReadOnlyForUnsupportedVersion,
               lessonID == model.selectedLessonID,
               model.store.lesson(id: lessonID)?.deepContent != nil,
-              !progress.hasViewedDeepLesson(lessonID)
+              !progress.hasViewedDeepLesson(lessonID),
+              activeLessonStage == nil
         else {
             return
         }
 
         scheduledDeepLessonTask = Task { @MainActor in
-            if delayNanoseconds > 0 {
-                try? await Task.sleep(nanoseconds: delayNanoseconds)
-            }
             await Task.yield()
 
             guard !Task.isCancelled,
+                  canPresentLearningStages,
                   settings.hasSeenWelcome,
+                  !progress.isReadOnlyForUnsupportedVersion,
                   model.selectedLessonID == lessonID,
                   !progress.hasViewedDeepLesson(lessonID),
-                  !showingDeepLesson,
-                  !showingModify,
+                  activeLessonStage == nil,
                   let lesson = model.store.lesson(id: lessonID),
                   let content = lesson.deepContent
             else {
@@ -398,12 +385,13 @@ struct LessonWorkspace: View {
             }
 
             scheduledDeepLessonTask = nil
-            deepLessonPresentation = LessonStagePresentation(
-                lesson: lesson,
-                content: content,
-                existingEditorCode: model.code
+            activeLessonStage = .deepLesson(
+                LessonStagePresentation(
+                    lesson: lesson,
+                    content: content,
+                    existingEditorCode: model.code
+                )
             )
-            showingDeepLesson = true
         }
     }
 
@@ -417,4 +405,18 @@ private struct LessonStagePresentation {
     let lesson: Lesson
     let content: LessonDeepContent
     let existingEditorCode: String
+}
+
+private enum ActiveLessonStage: Identifiable {
+    case deepLesson(LessonStagePresentation)
+    case modify(LessonStagePresentation)
+
+    var id: String {
+        switch self {
+        case .deepLesson(let presentation):
+            return "deep-lesson-\(presentation.lesson.id)"
+        case .modify(let presentation):
+            return "modify-\(presentation.lesson.id)"
+        }
+    }
 }

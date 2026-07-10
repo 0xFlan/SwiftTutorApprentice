@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var showingLessonEditor = false
     @State private var showingSettings = false
     @State private var showingWelcome = false
+    @State private var welcomePresentationIsComplete = false
 
     var body: some View {
         NavigationSplitView {
@@ -31,18 +32,26 @@ struct ContentView: View {
                 onOpenSettings: { showingSettings = true }
             )
         } detail: {
-            LessonWorkspace(model: model, settings: model.settings, progress: model.progress)
+            LessonWorkspace(
+                model: model,
+                settings: model.settings,
+                progress: model.progress,
+                canPresentLearningStages: welcomePresentationIsComplete
+            )
                 .navigationTitle("SwiftTutor Apprentice")
                 .navigationSubtitle("Lesson \(model.currentDisplayNumber): \(model.currentLesson.title)")
         }
         .frame(minWidth: 680, minHeight: 520)
-        // First-run welcome / onboarding. Driven by ContentView-owned @State
-        // (not a binding into model.settings, which ContentView doesn't observe)
-        // so dismissing it reliably re-renders and closes the sheet.
+        // First-run welcome / onboarding. Learning-stage sheets are gated on
+        // this sheet's actual dismissal, not just the persisted welcome flag.
         .onAppear {
-            showingWelcome = !model.settings.hasSeenWelcome
+            let needsWelcome = !model.settings.hasSeenWelcome
+            showingWelcome = needsWelcome
+            welcomePresentationIsComplete = !needsWelcome
         }
-        .sheet(isPresented: $showingWelcome) {
+        .sheet(isPresented: $showingWelcome, onDismiss: {
+            welcomePresentationIsComplete = true
+        }) {
             WelcomeView(onStart: {
                 model.settings.hasSeenWelcome = true
                 showingWelcome = false
