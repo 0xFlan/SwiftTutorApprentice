@@ -48,8 +48,8 @@ struct LessonListSidebar: View {
                     }
                     .buttonStyle(.borderless)
                     .font(.caption)
-                    .help("Forget all completed lessons")
-                    .disabled(progress.completedCount == 0)
+                    .help(resetHelp)
+                    .disabled(resetIsDisabled)
                 }
 
                 Button {
@@ -58,7 +58,8 @@ struct LessonListSidebar: View {
                     Label("Manage lessons", systemImage: "square.and.pencil")
                         .frame(maxWidth: .infinity)
                 }
-                .help("Add, edit, reorder, or delete lessons — all inside the app")
+                .help(manageLessonsHelp)
+                .disabled(store.isReadOnlyForUnsupportedDeepContent)
 
                 Button {
                     onOpenSettings()
@@ -90,5 +91,26 @@ struct LessonListSidebar: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    private var resetIsDisabled: Bool {
+        progress.isReadOnlyForUnsupportedVersion
+            || (progress.completedLessonIDs.isEmpty && progress.stageEvents.isEmpty)
+    }
+
+    private var resetHelp: String {
+        if progress.isReadOnlyForUnsupportedVersion {
+            return "Reset is unavailable because this progress file was created by a newer app version."
+        }
+
+        return "Clear completed lessons and all Deep Lesson and Modify activity"
+    }
+
+    private var manageLessonsHelp: String {
+        if store.isReadOnlyForUnsupportedDeepContent {
+            return "Lesson editing is unavailable because this lesson file contains newer or unsupported Deep Lesson data."
+        }
+
+        return "Add, edit, reorder, or delete lessons — all inside the app"
     }
 }

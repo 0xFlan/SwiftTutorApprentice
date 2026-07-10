@@ -10,21 +10,38 @@
 
 import SwiftUI
 
+struct LessonEditorDraftState {
+    var draft: Lesson
+
+    func hasUnsavedChanges(comparedTo storedVersion: Lesson?) -> Bool {
+        storedVersion != draft
+    }
+
+    @discardableResult
+    mutating func commit(to store: LessonStore) -> Lesson? {
+        guard let normalizedLesson = store.update(draft) else { return nil }
+        draft = normalizedLesson
+        return normalizedLesson
+    }
+}
+
 struct LessonEditorView: View {
     @ObservedObject var store: LessonStore
     @Environment(\.dismiss) private var dismiss
 
-    @State private var draft: Lesson
+    @State private var draftState: LessonEditorDraftState
 
     init(store: LessonStore, initialSelection: Int) {
         self.store = store
         let start = store.lesson(id: initialSelection) ?? store.lessons.first ?? Curriculum.defaultLessons[0]
-        _draft = State(initialValue: start)
+        _draftState = State(initialValue: LessonEditorDraftState(draft: start))
     }
 
     /// The saved version of whatever we're editing (nil if it's brand new).
-    private var storedVersion: Lesson? { store.lesson(id: draft.id) }
-    private var hasUnsavedChanges: Bool { storedVersion != draft }
+    private var storedVersion: Lesson? { store.lesson(id: draftState.draft.id) }
+    private var hasUnsavedChanges: Bool {
+        draftState.hasUnsavedChanges(comparedTo: storedVersion)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -67,7 +84,7 @@ struct LessonEditorView: View {
     private var lessonList: some View {
         VStack(spacing: 0) {
             List(selection: Binding(
-                get: { draft.id },
+                get: { draftState.draft.id },
                 set: { if let id = $0 { switchTo(id) } }
             )) {
                 ForEach(Array(store.lessons.enumerated()), id: \.element.id) { index, lesson in
@@ -92,12 +109,12 @@ struct LessonEditorView: View {
                     .help("Add a new lesson")
 
                 Button {
-                    store.move(id: draft.id, by: -1)
+                    store.move(id: draftState.draft.id, by: -1)
                 } label: { Image(systemName: "arrow.up") }
                     .help("Move this lesson up")
 
                 Button {
-                    store.move(id: draft.id, by: 1)
+                    store.move(id: draftState.draft.id, by: 1)
                 } label: { Image(systemName: "arrow.down") }
                     .help("Move this lesson down")
 
@@ -116,7 +133,7 @@ struct LessonEditorView: View {
 
             Button {
                 store.restoreDefaults()
-                if let first = store.lessons.first { draft = first }
+                if let first = store.lessons.first { draftState.draft = first }
             } label: {
                 Label("Restore default lessons", systemImage: "arrow.counterclockwise")
                     .font(.caption)
@@ -134,20 +151,20 @@ struct LessonEditorView: View {
             VStack(alignment: .leading, spacing: 16) {
 
                 field("Title") {
-                    TextField("Lesson title", text: $draft.title)
+                    TextField("Lesson title", text: $draftState.draft.title)
                 }
 
                 field("Goal") {
-                    TextField("One sentence: what will the learner achieve?", text: $draft.goal, axis: .vertical)
+                    TextField("One sentence: what will the learner achieve?", text: $draftState.draft.goal, axis: .vertical)
                         .lineLimit(2...4)
                 }
 
                 field("Starter code (what the learner types)") {
-                    codeEditor(text: $draft.starterCode, minHeight: 90)
+                    codeEditor(text: $draftState.draft.starterCode, minHeight: 90)
                 }
 
                 field("Expected output (used to auto-complete the lesson)") {
-                    codeEditor(text: $draft.expectedOutput, minHeight: 44)
+                    codeEditor(text: $draftState.draft.expectedOutput, minHeight: 44)
                 }
 
                 twoColumn(
@@ -160,17 +177,17 @@ struct LessonEditorView: View {
                 }
 
                 field("Coach message when the code looks right") {
-                    TextField("Success message", text: $draft.successMessage, axis: .vertical)
+                    TextField("Success message", text: $draftState.draft.successMessage, axis: .vertical)
                         .lineLimit(2...6)
                 }
 
                 field("Coach hint when the code isn't there yet") {
-                    TextField("Hint", text: $draft.hint, axis: .vertical)
+                    TextField("Hint", text: $draftState.draft.hint, axis: .vertical)
                         .lineLimit(2...6)
                 }
 
                 field("Why the syntax? (shown under the Syntax Lens)") {
-                    TextField("Explanation", text: $draft.syntaxWhy, axis: .vertical)
+                    TextField("Explanation", text: $draftState.draft.syntaxWhy, axis: .vertical)
                         .lineLimit(3...8)
                 }
 
@@ -190,15 +207,19 @@ struct LessonEditorView: View {
                     .font(.headline)
                 Spacer()
                 Button {
-                    draft.syntaxTokens = SyntaxTokenizer.tokenize(draft.starterCode)
+                    draftState.draft.syntaxTokens = SyntaxTokenizer.tokenize(
+                        draftState.draft.starterCode
+                    )
                 } label: {
                     Label("Auto-generate", systemImage: "wand.and.stars")
                 }
                 .buttonStyle(.borderless)
                 .help("Generate tokens automatically from the starter code")
                 Button {
-                    let nextID = (draft.syntaxTokens.map(\.id).max() ?? -1) + 1
-                    draft.syntaxTokens.append(SyntaxToken(id: nextID, display: "", explanation: ""))
+                    let nextID = (draftState.draft.syntaxTokens.map(\.id).max() ?? -1) + 1
+                    draftState.draft.syntaxTokens.append(
+                        SyntaxToken(id: nextID, display: "", explanation: "")
+                    )
                 } label: {
                     Label("Add token", systemImage: "plus")
                 }
@@ -208,7 +229,7 @@ struct LessonEditorView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            ForEach($draft.syntaxTokens) { $token in
+            ForEach($draftState.draft.syntaxTokens) { $token in
                 HStack(alignment: .top, spacing: 8) {
                     TextField("chip", text: $token.display)
                         .font(.system(.body, design: .monospaced))
@@ -216,7 +237,7 @@ struct LessonEditorView: View {
                     TextField("explanation", text: $token.explanation, axis: .vertical)
                         .lineLimit(1...4)
                     Button(role: .destructive) {
-                        draft.syntaxTokens.removeAll { $0.id == token.id }
+                        draftState.draft.syntaxTokens.removeAll { $0.id == token.id }
                     } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.borderless)
                 }
@@ -255,9 +276,9 @@ struct LessonEditorView: View {
     /// Bridges a [String] property to a single newline-separated text field.
     private func linesBinding(_ keyPath: WritableKeyPath<Lesson, [String]>) -> Binding<String> {
         Binding(
-            get: { draft[keyPath: keyPath].joined(separator: "\n") },
+            get: { draftState.draft[keyPath: keyPath].joined(separator: "\n") },
             set: { newValue in
-                draft[keyPath: keyPath] = newValue
+                draftState.draft[keyPath: keyPath] = newValue
                     .split(separator: "\n", omittingEmptySubsequences: false)
                     .map { $0.trimmingCharacters(in: .whitespaces) }
                     .filter { !$0.isEmpty }
@@ -268,15 +289,13 @@ struct LessonEditorView: View {
     // MARK: - Actions
 
     private func commitDraft() {
-        if store.lesson(id: draft.id) != nil {
-            store.update(draft)
-        }
+        draftState.commit(to: store)
     }
 
     private func switchTo(_ id: Int) {
-        guard id != draft.id else { return }
+        guard id != draftState.draft.id else { return }
         commitDraft()
-        if let lesson = store.lesson(id: id) { draft = lesson }
+        if let lesson = store.lesson(id: id) { draftState.draft = lesson }
     }
 
     private func addLesson() {
@@ -296,12 +315,12 @@ struct LessonEditorView: View {
             hint: "Type the starter code above."
         )
         store.add(new)
-        draft = new
+        draftState.draft = new
     }
 
     private func deleteLesson() {
-        let idToDelete = draft.id
+        let idToDelete = draftState.draft.id
         store.delete(id: idToDelete)
-        if let first = store.lessons.first { draft = first }
+        if let first = store.lessons.first { draftState.draft = first }
     }
 }

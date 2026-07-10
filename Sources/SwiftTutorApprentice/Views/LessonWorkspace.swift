@@ -14,6 +14,12 @@ struct LessonWorkspace: View {
     @ObservedObject var model: AppModel
     @ObservedObject var settings: AppSettings
     @ObservedObject var progress: ProgressStore
+    let canPresentLearningStages: Bool
+
+    @State private var activeLessonStage: ActiveLessonStage?
+    @State private var scheduledDeepLessonTask: Task<Void, Never>?
+    @State private var hasHandledInitialAutomaticPresentation = false
+    @State private var hasDeferredAutomaticPresentation = false
 
     /// Which single panel to show when the window is too narrow for 3 columns.
     private enum Panel: String, CaseIterable, Identifiable {
@@ -33,6 +39,27 @@ struct LessonWorkspace: View {
 
             navigationBar
             Divider()
+
+            if model.store.isReadOnlyForUnsupportedDeepContent {
+                readOnlyLessonsBanner
+                Divider()
+            }
+
+            if progress.isReadOnlyForUnsupportedVersion {
+                readOnlyProgressBanner
+                Divider()
+            }
+
+            if model.currentLesson.deepContent != nil {
+                LessonStageStepper(
+                    deepLessonComplete: progress.hasViewedDeepLesson(model.selectedLessonID),
+                    modifyComplete: progress.hasPassedModify(model.selectedLessonID),
+                    practiceComplete: progress.isComplete(model.selectedLessonID),
+                    onOpenDeepLesson: openDeepLessonManually,
+                    onOpenModify: openModifyManually
+                )
+                Divider()
+            }
 
             if model.isPlayingWalkthrough {
                 walkthroughBanner
@@ -83,6 +110,55 @@ struct LessonWorkspace: View {
                     onRun: model.run
                 )
                 .frame(minHeight: 200)
+            }
+        }
+        .onAppear {
+            handleInitialAutomaticPresentationIfNeeded()
+        }
+        .onChange(of: model.selectedLessonID) { _, lessonID in
+            handleLessonSelectionChange(to: lessonID)
+        }
+        .onChange(of: canPresentLearningStages) { _, isAllowed in
+            handleLearningStageGateChange(isAllowed: isAllowed)
+        }
+        .onDisappear {
+            cancelAutomaticPresentationRequest()
+            activeLessonStage = nil
+        }
+        .sheet(item: $activeLessonStage) { stage in
+            switch stage {
+            case .deepLesson(let presentation):
+                DeepLessonView(
+                    lesson: presentation.lesson,
+                    content: presentation.content,
+                    onViewed: {
+                        progress.markDeepLessonViewed(presentation.lesson.id)
+                    },
+                    onRecallAnswer: { questionID, wasCorrect in
+                        progress.recordRecallAnswer(
+                            lessonID: presentation.lesson.id,
+                            questionID: questionID,
+                            wasCorrect: wasCorrect
+                        )
+                    }
+                )
+            case .modify(let presentation):
+                ModifyTaskView(
+                    task: presentation.content.modifyTask,
+                    existingEditorCode: presentation.existingEditorCode,
+                    progressCanBeSaved: !progress.isReadOnlyForUnsupportedVersion,
+                    onPassed: {
+                        progress.markModifyPassed(presentation.lesson.id)
+                    },
+                    onReplaceEditor: { code, prediction in
+                        guard model.selectedLessonID == presentation.lesson.id else {
+                            return
+                        }
+                        model.code = code
+                        model.prediction = prediction
+                        model.runResult = nil
+                    }
+                )
             }
         }
     }
@@ -138,6 +214,10 @@ struct LessonWorkspace: View {
                 if progress.isComplete(model.selectedLessonID) {
                     Label("Read", systemImage: "checkmark.seal.fill")
                         .foregroundStyle(.green)
+                } else if progress.isReadOnlyForUnsupportedVersion {
+                    Label("Progress read-only", systemImage: "lock.fill")
+                        .foregroundStyle(.secondary)
+                        .help("Mark as read is unavailable because this progress file was created by a newer app version.")
                 } else {
                     Button {
                         model.markCurrentLessonRead()
@@ -172,6 +252,54 @@ struct LessonWorkspace: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(Color.accentColor.opacity(0.10))
+    }
+
+    private var readOnlyProgressBanner: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Progress is read-only")
+                    .font(.callout.bold())
+                    .foregroundStyle(.primary)
+
+                Text("This progress file was created by a newer app version. Completion and Deep Lesson or Modify activity cannot be saved. You can still study lessons and run code.")
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.11))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var readOnlyLessonsBanner: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Lesson editing is disabled")
+                    .font(.callout.bold())
+                    .foregroundStyle(.primary)
+
+                Text("This lesson file contains newer or unsupported Deep Lesson data. Some newer enrichment may remain viewable, but automatic enrichment and lesson editing are disabled to preserve the file's exact data. Base lessons remain available.")
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.11))
+        .accessibilityElement(children: .combine)
     }
 
     private var navigationBar: some View {
@@ -225,5 +353,149 @@ struct LessonWorkspace: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .animation(.easeInOut(duration: 0.2), value: progress.isComplete(model.selectedLessonID))
+    }
+
+    private func currentStagePresentation() -> LessonStagePresentation? {
+        let lesson = model.currentLesson
+        guard lesson.id == model.selectedLessonID,
+              let content = lesson.deepContent
+        else {
+            return nil
+        }
+
+        return LessonStagePresentation(
+            lesson: lesson,
+            content: content,
+            existingEditorCode: model.code
+        )
+    }
+
+    private func openDeepLessonManually() {
+        cancelAutomaticPresentationRequest()
+        guard let presentation = currentStagePresentation() else { return }
+        activeLessonStage = .deepLesson(presentation)
+    }
+
+    private func openModifyManually() {
+        cancelAutomaticPresentationRequest()
+        guard let presentation = currentStagePresentation() else { return }
+        activeLessonStage = .modify(presentation)
+    }
+
+    private func handleLessonSelectionChange(to lessonID: Int) {
+        cancelScheduledDeepLesson()
+        activeLessonStage = nil
+
+        if canPresentLearningStages {
+            hasDeferredAutomaticPresentation = false
+            scheduleAutomaticDeepLesson(for: lessonID)
+        } else {
+            hasDeferredAutomaticPresentation = true
+        }
+    }
+
+    private func handleInitialAutomaticPresentationIfNeeded() {
+        guard !hasHandledInitialAutomaticPresentation,
+              canPresentLearningStages
+        else {
+            return
+        }
+
+        hasHandledInitialAutomaticPresentation = true
+        hasDeferredAutomaticPresentation = false
+        scheduleAutomaticDeepLesson(for: model.selectedLessonID)
+    }
+
+    private func handleLearningStageGateChange(isAllowed: Bool) {
+        guard isAllowed else {
+            if scheduledDeepLessonTask != nil {
+                hasDeferredAutomaticPresentation = true
+            }
+            cancelScheduledDeepLesson()
+            return
+        }
+
+        if !hasHandledInitialAutomaticPresentation {
+            hasHandledInitialAutomaticPresentation = true
+            hasDeferredAutomaticPresentation = false
+            scheduleAutomaticDeepLesson(for: model.selectedLessonID)
+            return
+        }
+
+        guard hasDeferredAutomaticPresentation else { return }
+        hasDeferredAutomaticPresentation = false
+        scheduleAutomaticDeepLesson(for: model.selectedLessonID)
+    }
+
+    private func scheduleAutomaticDeepLesson(for lessonID: Int) {
+        cancelScheduledDeepLesson()
+
+        guard canPresentLearningStages,
+              settings.hasSeenWelcome,
+              !progress.isReadOnlyForUnsupportedVersion,
+              lessonID == model.selectedLessonID,
+              model.store.lesson(id: lessonID)?.deepContent != nil,
+              !progress.hasViewedDeepLesson(lessonID),
+              activeLessonStage == nil
+        else {
+            return
+        }
+
+        scheduledDeepLessonTask = Task { @MainActor in
+            await Task.yield()
+
+            guard !Task.isCancelled else { return }
+            scheduledDeepLessonTask = nil
+
+            guard canPresentLearningStages,
+                  settings.hasSeenWelcome,
+                  !progress.isReadOnlyForUnsupportedVersion,
+                  model.selectedLessonID == lessonID,
+                  !progress.hasViewedDeepLesson(lessonID),
+                  activeLessonStage == nil,
+                  let lesson = model.store.lesson(id: lessonID),
+                  let content = lesson.deepContent
+            else {
+                return
+            }
+
+            activeLessonStage = .deepLesson(
+                LessonStagePresentation(
+                    lesson: lesson,
+                    content: content,
+                    existingEditorCode: model.code
+                )
+            )
+        }
+    }
+
+    private func cancelScheduledDeepLesson() {
+        scheduledDeepLessonTask?.cancel()
+        scheduledDeepLessonTask = nil
+    }
+
+    private func cancelAutomaticPresentationRequest() {
+        cancelScheduledDeepLesson()
+        hasDeferredAutomaticPresentation = false
+    }
+}
+
+private struct LessonStagePresentation {
+    let lesson: Lesson
+    let content: LessonDeepContent
+    let existingEditorCode: String
+}
+
+private enum ActiveLessonStage: Identifiable {
+    case deepLesson(LessonStagePresentation)
+    case modify(LessonStagePresentation)
+
+    var id: String {
+        switch self {
+        case .deepLesson(let presentation):
+            return "deep-lesson-\(presentation.lesson.id)"
+        case .modify(let presentation):
+            return "modify-\(presentation.lesson.id)"
+        }
     }
 }

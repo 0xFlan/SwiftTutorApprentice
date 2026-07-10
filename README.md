@@ -48,6 +48,33 @@ Lessons 23–24 are **read-only concept lessons** (SwiftUI builds a UI, which
 the console runner can't display) — you read and "mark as read" instead of
 running.
 
+### Deep Lesson pilot (Lessons 1–3)
+
+The first three built-in lessons add an optional, concept-first path before the
+usual workspace. The first time you visit one, its **Deep Lesson** sheet opens
+after onboarding closes. You can skip it immediately. The non-locking **Deep
+Lesson** and **Modify** stage buttons let you open or replay either sheet at any
+time; **Practice & Run** is the existing workspace and remains available
+throughout.
+
+Each Deep Lesson pairs short segments with working examples and common wrong
+variants, then uses a **Syntax Microscope** to label each piece **Required by
+Swift**, **Convention**, or **Depends on context**. Recall questions check the
+ideas before a guided **Modify** task asks you to change working code and
+predict its new output.
+
+After Modify accepts both the code and prediction, you can place them in the
+existing editor for a real Run; the app asks before overwriting different
+editor content. This does not replace or lock the normal workspace, and passing
+Modify does not complete a lesson. Completion still requires a successful Run
+whose output matches the lesson's expected output.
+
+The pilot remains fully offline and local by default. Its stage progress is
+versioned and preserved alongside existing completion, while legacy lessons,
+progress files, and custom lessons remain compatible. This pilot applies only
+to built-in Lessons 1–3; it does not add web tracks or rewrite the app as a new
+platform.
+
 **The learning loop, every code lesson:**
 
 1. Read the lesson (left): goal, what to type, clickable glossary terms, and a
@@ -127,4 +154,3 @@ doesn't need it.
 Full multi-line Syntax Lens tokenizing (currently the key line); richer
 in-editor diagnostics from the Swift compiler; more concept lessons; a
 "review my whole project" AI action. See the `TODO:` comments in the source.
-```

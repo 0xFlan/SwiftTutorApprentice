@@ -28,6 +28,12 @@ let package = Package(
         .executableTarget(
             name: "SwiftTutorApprentice",
             path: "Sources/SwiftTutorApprentice"
+        ),
+        .testTarget(
+            name: "SwiftTutorApprenticeTests",
+            dependencies: ["SwiftTutorApprentice"],
+            path: "Tests/SwiftTutorApprenticeTests",
+            resources: [.copy("Fixtures")]
         )
     ]
 )

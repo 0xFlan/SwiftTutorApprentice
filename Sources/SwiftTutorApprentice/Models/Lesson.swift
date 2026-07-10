@@ -67,6 +67,14 @@ struct Lesson: Identifiable, Hashable, Codable {
     /// Defaults to `.code` so existing call sites and older saved files
     /// (which have no `kind` field) keep working.
     var kind: LessonKind = .code
+
+    /// Optional concept-first teaching content for supported lessons.
+    /// Defaults to `nil` so legacy and custom lessons keep their current flow.
+    var deepContent: LessonDeepContent? = nil
+
+    /// True only when a saved lesson contains Deep Lesson data this app cannot
+    /// decode. This runtime safety state is deliberately excluded from JSON.
+    private(set) var hasUnsupportedDeepContent = false
 }
 
 // Custom decoding lives in an extension so the memberwise initializer is still
@@ -77,7 +85,24 @@ extension Lesson {
     private enum CodingKeys: String, CodingKey {
         case id, title, goal, starterCode, teaches, glossaryTerms,
              syntaxTokens, syntaxWhy, expectedOutput, successMarkers,
-             successMessage, hint, kind
+             successMessage, hint, kind, deepContent
+    }
+
+    private struct DeepContentSchemaEnvelope: Decodable {
+        let schemaVersion: Int
+
+        private enum CodingKeys: String, CodingKey {
+            case schemaVersion
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            if c.contains(.schemaVersion) {
+                schemaVersion = try c.decode(Int.self, forKey: .schemaVersion)
+            } else {
+                schemaVersion = LessonDeepContent.currentSchemaVersion
+            }
+        }
     }
 
     init(from decoder: Decoder) throws {
@@ -95,5 +120,29 @@ extension Lesson {
         successMessage = try c.decode(String.self, forKey: .successMessage)
         hint = try c.decode(String.self, forKey: .hint)
         kind = try c.decodeIfPresent(LessonKind.self, forKey: .kind) ?? .code
+        if !c.contains(.deepContent) {
+            deepContent = nil
+            hasUnsupportedDeepContent = false
+        } else if try c.decodeNil(forKey: .deepContent) {
+            deepContent = nil
+            hasUnsupportedDeepContent = false
+        } else {
+            do {
+                let envelope = try c.decode(
+                    DeepContentSchemaEnvelope.self,
+                    forKey: .deepContent
+                )
+                guard envelope.schemaVersion == LessonDeepContent.currentSchemaVersion else {
+                    deepContent = nil
+                    hasUnsupportedDeepContent = true
+                    return
+                }
+                deepContent = try c.decode(LessonDeepContent.self, forKey: .deepContent)
+                hasUnsupportedDeepContent = false
+            } catch {
+                deepContent = nil
+                hasUnsupportedDeepContent = true
+            }
+        }
     }
 }
