@@ -6,3 +6,5 @@ Workspace/
 .DS_Store
 # Generated .app bundle
 dist/
+# Local isolated development worktrees
+.worktrees/

@@ -1,6 +1,6 @@
 # SwiftTutor Apprentice
 
-A private, local macOS app for learning Swift by hand. Not a chatbot: it
+A free, open-source, local macOS app for learning Swift by hand. Not a chatbot: it
 teaches you to *understand* code — what you typed, what each part means, why
 Swift needs the syntax, and what happens when it runs.
 
@@ -123,6 +123,10 @@ built-in curriculum.
 The rule-based coach always works offline; AI is additive and only runs when
 you turn it on and press the button.
 
+For an open-source build, prefer the CLI option. API keys are currently stored
+in the app's local preferences rather than macOS Keychain and should be treated
+as development credentials, not long-lived production secrets.
+
 ## Where things are stored
 
 - Code you run: `~/Developer/SwiftTutorApprentice/Workspace/main.swift`
@@ -148,6 +152,28 @@ If you see `sandbox-exec: sandbox_apply: Operation not permitted` when
 building, your shell is inside a sandbox that blocks the one SwiftPM starts.
 Add `--disable-sandbox` (`build-app.sh` already does). A normal Terminal
 doesn't need it.
+
+## Roadmap
+
+The approved next milestone adds a stable Course Home, course-scoped progress,
+an embedded offline animated lesson player for Swift Lessons 1–3, and fixes for
+sidebar/detail clipping and accidental bottom-scroll restoration. The platform
+is designed to expand into complete certification-oriented Swift Development,
+Web Development, Cybersecurity, and Networking courses, including exercises
+that teach AI-first beginners to understand and verify generated code.
+
+See the [reviewed platform design](docs/superpowers/specs/2026-07-10-course-platform-animated-certification-tracks-design.md)
+and [learning research](outputs/2026-07-10-learning-optimization-research.md).
+
+## Contributing
+
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md)
+for the development workflow and [SECURITY.md](SECURITY.md) for private
+vulnerability reporting.
+
+## License
+
+SwiftTutor Apprentice is available under the [MIT License](LICENSE).
 
 ## Still deferred (future ideas)
 
