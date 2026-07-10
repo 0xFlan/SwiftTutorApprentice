@@ -29,7 +29,7 @@ implementation risk without reducing the approved final scope.
 - Every app launch enters Course Home after the one-time welcome flow. It does
   not restore a lesson or an old scroll position as the root screen.
 - Course Home makes Swift, Web, Cybersecurity, and Networking obvious and easy
-  to switch between. One Start or Continue action is visually dominant.
+  to switch between. One Start, Continue, or Review action is visually dominant.
 - The first teaching element in each supported lesson is an actual offline
   animated or slideshow-style explanation embedded at the top of the lesson.
 - A first visit expands a paused poster. Motion and narration begin only after
@@ -83,7 +83,7 @@ the interfaces and acceptance criteria here.
 
 ### Milestone 1: Platform and animated Swift pilot
 
-- Course identities, catalog, certification profiles, and Course Home.
+- Course identities, catalog, certification target summaries, and Course Home.
 - Swift Development active; Web Development, Cybersecurity, and Networking
   visible as Coming next cards with their certification targets.
 - Course-scoped progress schema and lossless legacy Swift migration.
@@ -91,6 +91,9 @@ the interfaces and acceptance criteria here.
   fix.
 - Reusable embedded presentation player and complete presentations for Swift
   Lessons 1-3.
+- Only the objective IDs referenced by the released Swift pilot activities are
+  activated; complete certification profiles and readiness remain disabled
+  until their course release level becomes `certificationReady`.
 - Recall, Modify, existing Practice/Run, captions, transcript, narration,
   Reduce Motion, keyboard, and VoiceOver support.
 - The existing Deep Lesson becomes optional Read deeper content.
@@ -153,16 +156,54 @@ Introduce stable string-backed identifiers:
   content, for example `swift.variables.mutation` or `networking.ipv4.subnet`.
 
 `CourseDefinition` is immutable bundled metadata containing `id`, `title`,
-`summary`, `icon`, `accent`, `availability`, ordered module descriptors,
-certification profiles, and the course runtime kind. `CourseCatalog` owns the
-four definitions and exposes lookup and display order. It does not own learner
-progress or mutable lesson workspace state.
+`summary`, `icon`, `accent`, `availability`, certification target summaries,
+release level, and the course runtime kind. `CourseCatalog` owns the four
+definitions and exposes lookup and display order. It does not own modules,
+lessons, learner progress, or mutable lesson workspace state.
 
 `CourseAvailability` is `available`, `comingNext`, or `contentUnavailable`.
 Milestone 1 marks only Swift Development available. A coming-next card can be
 inspected but cannot enter an empty workspace.
 
+`CourseReleaseLevel` is `pilot`, `inDevelopment`, or `certificationReady`.
+Milestone 1 marks Swift as `pilot` even though its workspace is available.
+Course Home therefore shows ordinary lesson completion for Swift, not a
+certification-readiness percentage.
+
+Course content resolves through a shared boundary:
+
+```swift
+protocol CourseContentProvider {
+    var courseID: CourseID { get }
+    var modules: [CourseModule] { get }
+    func lessons(in moduleID: ModuleID) -> [CourseLesson]
+    func lesson(for key: LessonKey) -> CourseLesson?
+    func contains(_ key: LessonKey) -> Bool
+}
+```
+
+`CourseLesson` pairs an explicit `LessonKey` with its `Lesson` value; consumers
+never derive a key from the legacy integer `Lesson.id`. `CourseModule` owns a
+stable module ID, title, instructional band, and ordered lesson local IDs. A
+provider owns module and lesson ordering and must return only keys for its own
+course. `CourseContentRegistry` maps available course IDs to providers and is
+the only object navigation uses to resolve course content.
+Milestone 1 supplies `LegacySwiftCourseProvider`, an adapter around the current
+`LessonStore`. Later bundled providers conform to the same protocol; their
+storage format and runtimes may differ without changing navigation.
+
+A `comingNext` course intentionally has no registered provider. An `available`
+course whose provider is absent or fails validation becomes
+`contentUnavailable`, displays a recoverable local-content error, and cannot
+open a partial workspace. This distinction prevents future course stores from
+being confused with intentionally unreleased content.
+
 ### Certification mapping
+
+`CertificationTargetSummary` contains only provider, credential name, optional
+exam code, and source URL. Course Home uses these summaries for Coming next and
+pilot courses; a summary does not activate readiness calculation or require a
+complete objective set.
 
 `CertificationProfile` contains:
 
@@ -177,9 +218,15 @@ inspected but cannot enter an empty workspace.
 - readiness requirements.
 
 Every assessable item declares one or more concept IDs and zero or more
-certification objective IDs. A build-time validator rejects bundled course
-content containing duplicate IDs, dangling mappings, empty required domains,
-or certification objectives with no teaching and no assessment coverage.
+certification objective IDs. A build-time validator always rejects duplicate
+IDs, dangling mappings, invalid domain membership, and references to an
+objective-set version not bundled for that course. For `pilot` and
+`inDevelopment` courses it validates only the objective references present in
+released content and reports uncovered objectives as development coverage, not
+as a build failure. For `certificationReady` courses it additionally rejects
+empty required domains and any objective without both teaching coverage and an
+independent assessment. Changing a course to `certificationReady` is therefore
+the explicit strict-validation gate.
 
 Certification profiles are versioned content, not hard-coded marketing copy.
 When a provider changes an exam, the app can retain the learner's concept
@@ -265,13 +312,19 @@ preserves the prior intentional status. A revision change resets only the
 resume position unless the bundled content explicitly declares a new
 presentation ID. Existing `deepLessonViewed` events remain historical written
 lesson activity and do not suppress first presentation of the new animation.
+Legacy lesson completion also does not imply presentation activity: a completed
+Swift Lesson 1-3 with no presentation state receives the same first-visit
+paused poster as any other learner.
 
 ### Versioned progress migration
 
 Progress schema version 3 contains a dictionary of course progress keyed by
-`CourseID`. Each course record contains completed lesson local IDs, stage
-events, presentation state, concept evidence, review state, last lesson, and
-certification readiness evidence.
+`CourseID`. Each course record contains completed lesson local IDs, identified
+stage events, presentation state, immutable assessment attempts, identified
+review records, last lesson, and derived readiness snapshots. Concept mastery
+and certification readiness are calculated from the identified attempts,
+reviews, active objective set, and mastery policy version; they are not stored
+as unversioned booleans.
 
 Migration rules are deterministic:
 
@@ -294,6 +347,14 @@ Store initializers continue accepting injected file URLs and clocks for tests.
 Schema decoding, migration, and serialization remain pure enough to test
 without constructing SwiftUI views.
 
+`LessonStore` applies the same fail-closed protection to `presentation` that it
+already applies to unsupported Deep Lesson data. A saved lesson with a newer or
+malformed non-null presentation schema keeps its other readable fields but
+makes lesson persistence and editing read-only so the unknown presentation
+bytes are never lost. Bundled presentation enrichment uses the current stable
+ID, kind, and starter-code compatibility check and copies only the missing
+presentation field.
+
 ### Workspace state
 
 `AppModel` gains an explicit root route and course selection rather than using
@@ -315,15 +376,33 @@ another.
 ## Course Home and Navigation
 
 Course Home shows one card per course with title, concise purpose, target
-credential, availability, private progress, and one Start or Continue action.
-It contains no leaderboard, public comparison, XP economy, streak-loss
-mechanic, or claim that time spent proves learning.
+credential, availability, private progress, and one Start, Continue, or Review
+action.
+In Milestone 1, progress is only released Swift lesson completion count over
+released Swift lesson count. Coming next courses show no percentage, and no
+card shows mastery or certification readiness until its course release level is
+`certificationReady`. Course Home contains no leaderboard, public comparison,
+XP economy, streak-loss mechanic, or claim that time spent proves learning.
 
-Entering an available course selects its stored last lesson or the first
-incomplete lesson. A Home toolbar action always returns to Course Home.
-Returning Home clears transient workspace presentation without erasing saved
-lesson work. Course switching happens through Home; Milestone 1 does not add a
-second persistent course switcher to the lesson sidebar.
+Course-card labels and destinations follow one deterministic policy:
+
+1. If the course has no completion, stage event, presentation action, submitted
+   attempt, review result, or saved workspace edit, label the action Start and
+   select the first lesson. Merely opening a course does not create meaningful
+   activity.
+2. If meaningful activity exists and the stored last lesson is valid and
+   incomplete, label the action Continue and select it.
+3. If the stored last lesson is valid and complete, select the first incomplete
+   lesson after it in module/course order, wrapping once to the beginning.
+4. If the stored key was deleted or is invalid, select the first incomplete
+   lesson in course order.
+5. If every released lesson is complete, label the action Review and select the
+   valid stored last lesson, falling back to the first lesson.
+
+A Home toolbar action always returns to Course Home. Returning Home clears
+transient workspace presentation without erasing saved lesson work. Course
+switching happens through Home; Milestone 1 does not add a second persistent
+course switcher to the lesson sidebar.
 
 ## Stable Layout and Scroll Contract
 
@@ -370,6 +449,14 @@ First visit behavior:
 5. The final scene hands off to one prediction or causal recall prompt.
 6. Continue moves to Modify and then the existing Practice/Run workspace.
 
+Skip means skip this presentation, not skip the lesson. It records `skipped`,
+collapses the player, suppresses automatic Resume for that presentation
+revision, and moves keyboard focus to Recall. It does not answer Recall, pass
+Modify, complete the lesson, or create mastery evidence. If the lesson has no
+Recall surface, focus moves to the next available Modify or Practice surface.
+Replay after a skip always starts scene one and changes status to `started`,
+after which ordinary resume behavior is available again.
+
 Returning visits show a compact completed, started, or skipped summary with
 Replay. Resume is offered only for a started, incomplete presentation whose
 saved scene still exists.
@@ -378,6 +465,11 @@ The player uses local SwiftUI drawing, transitions, timers, and macOS speech
 synthesis. It bundles no prerecorded streaming media and makes no network
 request. Captions are always available and remain synchronized with the
 current scene rather than wall-clock audio timing.
+
+If the requested local speech voice is unavailable, narration disables for that
+session and the player continues with captions and transcript; it never
+downloads a voice. Changing scene, lesson, course, route, or app activity
+cancels the current narration and timer before starting any subsequent state.
 
 Reduce Motion replaces interpolation and travel with immediate before/after
 states. VoiceOver announces scene number, playback state, focused code/value,
@@ -406,6 +498,42 @@ timestamp, content revision, and whether the problem was previously seen.
 Durable mastery requires independent success plus a later varied or delayed
 success. Exact intervals remain transparent product policy rather than a claim
 of scientifically optimal scheduling.
+
+New assessment and review persistence uses stable identities:
+
+- `ActivityID` identifies the authored exercise across revisions.
+- `ItemVariantID` identifies the concrete prompt/input variant; replaying the
+  same variant retains the same ID.
+- `AttemptID` is created once when the learner submits a response and is reused
+  for retries of the same persistence operation. Duplicate writes with the same
+  attempt ID are ignored.
+- `ObjectiveSetID` identifies the provider, credential, and effective objective
+  version used by an assessment mapping.
+- `MasteryPolicyVersion` identifies the transparent rules used to derive
+  mastery and readiness.
+- `ReviewID` identifies one scheduled concept review and optionally links to
+  the attempt that satisfied it.
+
+An immutable attempt record contains attempt ID, lesson key, activity ID, item
+variant ID, concept IDs, objective IDs plus objective-set ID, scaffold level,
+result, content revision, first-seen state, and submitted timestamp. A new
+submission receives a new attempt ID even when it repeats an item. Repeating a
+known variant is marked previously seen and cannot satisfy an unseen-transfer
+requirement. The same attempt cannot count twice because derived mastery uses
+unique attempt IDs.
+
+Review records contain review ID, concept ID, creation and due timestamps,
+policy version, source evidence IDs, and optional satisfying attempt ID.
+Certification readiness is a derived `ReadinessSnapshot` containing objective
+set ID, policy version, calculation timestamp, and the exact evidence IDs used;
+it is recomputed when content, objective mappings, or policy versions change.
+The persisted snapshot is explanatory cache data, not an authoritative boolean.
+
+New version 3 stage events receive stable event IDs. Migrated version 1 and 2
+events receive deterministic legacy IDs from their course, lesson, kind,
+question ID when present, and retained first timestamp. This preserves existing
+idempotency while allowing later evidence and review records to refer to a
+specific event without inventing duplicates.
 
 Certification readiness requires:
 
@@ -449,8 +577,29 @@ and browser security.
 After foundations, the course interleaves all three technologies through
 integrated projects. The offline runtime uses a multi-file workspace with
 `index.html`, `styles.css`, and `script.js`, renders in a contained WebKit
-preview, blocks unintended external navigation by default, and validates
-behavior and structure without requiring one exact source solution.
+preview, and validates behavior and structure without requiring one exact
+source solution.
+
+The WebKit containment contract is strict:
+
+- Use a nonpersistent website data store and an in-memory
+  `swifttutor-preview://project/` scheme handler for normalized project paths.
+- Do not grant `file://` access and do not expose arbitrary filesystem,
+  process, shell, clipboard, credential, or network APIs to JavaScript.
+- Inject a Content Security Policy with `connect-src 'none'`,
+  `frame-src 'none'`, `object-src 'none'`, `base-uri 'none'`, and
+  `form-action 'none'`; allow scripts, styles, images, fonts, and media only
+  from the project origin or explicitly required inline/data/blob forms.
+- Apply a WebKit content-rule list that blocks `http`, `https`, `ws`, and `wss`
+  subresources even if authored markup attempts to bypass the policy.
+- Navigation delegates allow only the project origin and `about:blank`, deny
+  new windows and custom URL schemes, and show a local blocked-link message
+  rather than opening an external destination automatically.
+- A native bridge, if required for console capture or deterministic validation,
+  accepts only versioned structured result messages. It exposes no command
+  execution capability and is removed when the preview is torn down.
+- Remote images, fonts, scripts, fetches, WebSockets, forms, and frames produce
+  an offline-resource validation message while leaving source intact.
 
 ### Cybersecurity
 
@@ -470,9 +619,9 @@ support recognition, mitigation, and authorized defensive reasoning.
 
 ### Networking
 
-The course covers device and terminal orientation, network types and
-topologies, media and devices, OSI and TCP/IP models, Ethernet, switching,
-routing, MAC addressing, IPv4, IPv6, subnetting, VLANs, NAT, DNS, DHCP, ports,
+The course covers device and terminal orientation, LAN/WAN topologies,
+physical media, routers and switches, OSI and TCP/IP models, Ethernet, MAC
+addressing, IPv4, IPv6, subnetting, routing, VLANs, NAT, DNS, DHCP, ports,
 protocols, sockets, wireless, VPNs, firewalls, cloud and virtualization,
 monitoring, documentation, support practice, security, and systematic
 troubleshooting.
@@ -543,6 +692,8 @@ check. The app assesses demonstrated understanding, not whether AI was used.
 
 - Player scene validation, transcript completeness, static alternatives, and
   concept/objective mappings.
+- Activity, item-variant, attempt, event, objective-set, review, and policy
+  identity uniqueness plus attempt-write idempotency.
 - Recall, hint-level, independent mastery, delayed evidence, course completion,
   and certification readiness calculations.
 - Web validation and preview navigation policy when that runtime ships.
@@ -584,6 +735,8 @@ the user opens is updated.
 
 - Course Home opens on every normal launch and presents all four approved
   courses with accurate availability and certification targets.
+- Milestone 1 cards show only released lesson completion and do not imply
+  mastery or certification readiness.
 - Swift Development opens through a Start/Continue action; returning Home and
   re-entering selects the correct lesson without restoring accidental scroll.
 - Existing Swift lessons, custom lessons, saved edits, completion, Deep Lesson
