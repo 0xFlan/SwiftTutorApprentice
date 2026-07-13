@@ -83,7 +83,7 @@ struct LessonListSidebar: View {
                     }
                     await Task.yield()
                     guard !Task.isCancelled,
-                          scrollCoordinator.fulfillSidebarVisibilityRequest(request)
+                          scrollCoordinator.sidebarVisibilityRequest == request
                     else { return }
                     switch request.alignment {
                     case .center:
@@ -91,6 +91,10 @@ struct LessonListSidebar: View {
                     case .nearest:
                         proxy.scrollTo(request.lessonKey)
                     }
+                    // Keep the request alive until ScrollViewReader receives
+                    // the command. Clearing the task's id first can cancel the
+                    // task before older SwiftUI runtimes mount a far-off row.
+                    scrollCoordinator.fulfillSidebarVisibilityRequest(request)
                 }
             }
 
