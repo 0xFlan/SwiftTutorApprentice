@@ -13,7 +13,6 @@ struct LessonListSidebar: View {
     @ObservedObject var store: LessonStore
     @ObservedObject var progress: ProgressStore
     @ObservedObject var scrollCoordinator: LessonScrollCoordinator
-    @StateObject private var nativeSidebar = NativeLessonSidebarController()
 
     /// Called when the learner taps the "Manage lessons" button.
     let onManageLessons: () -> Void
@@ -78,17 +77,6 @@ struct LessonListSidebar: View {
                     }
                 }
                 .listStyle(.sidebar)
-                .onChange(of: scrollCoordinator.sidebarVisibilityRequest) { _, request in
-                    guard let request else { return }
-                    let result = nativeSidebar.reveal(
-                        request.lessonKey,
-                        orderedKeys: sidebarLessons.map(\.id),
-                        alignment: request.alignment
-                    )
-                    if result == .alreadyVisible {
-                        scrollCoordinator.fulfillSidebarVisibilityRequest(request)
-                    }
-                }
                 .task(id: scrollCoordinator.sidebarVisibilityRequest?.id) {
                     guard let request = scrollCoordinator.sidebarVisibilityRequest else {
                         return
@@ -97,41 +85,16 @@ struct LessonListSidebar: View {
                     guard !Task.isCancelled,
                           scrollCoordinator.sidebarVisibilityRequest == request
                     else { return }
-                    let lessonKeys = sidebarLessons.map(\.id)
                     switch request.alignment {
                     case .center:
-                        nativeSidebar.reveal(
-                            request.lessonKey,
-                            orderedKeys: lessonKeys,
-                            alignment: .center
-                        )
                         proxy.scrollTo(request.lessonKey, anchor: .center)
                     case .nearest:
-                        if nativeSidebar.reveal(
-                            request.lessonKey,
-                            orderedKeys: lessonKeys,
-                            alignment: .nearest
-                        ) == .alreadyVisible {
-                            scrollCoordinator.fulfillSidebarVisibilityRequest(request)
-                            return
-                        }
                         proxy.scrollTo(request.lessonKey)
-                        // macOS 14 can ignore an unanchored List scroll when
-                        // the destination row has not been mounted yet. Give
-                        // the nearest-edge command one render turn, then use a
-                        // centered fallback only if a visible row probe has
-                        // not already consumed the request.
-                        try? await Task.sleep(nanoseconds: 100_000_000)
-                        guard !Task.isCancelled,
-                              scrollCoordinator.sidebarVisibilityRequest == request
-                        else { return }
-                        nativeSidebar.reveal(
-                            request.lessonKey,
-                            orderedKeys: lessonKeys,
-                            alignment: .center
-                        )
-                        proxy.scrollTo(request.lessonKey, anchor: .center)
                     }
+                    // Keep the request alive until ScrollViewReader receives
+                    // the command. Clearing the task's id first can cancel the
+                    // task before older SwiftUI runtimes mount a far-off row.
+                    scrollCoordinator.fulfillSidebarVisibilityRequest(request)
                 }
             }
 
@@ -236,19 +199,9 @@ struct LessonListSidebar: View {
         .padding(.vertical, 2)
         .background {
             ZStack {
-                SidebarLessonRowProbe(
-                    identifier: "lesson-row-\(key.id)",
-                    request: scrollCoordinator.sidebarVisibilityRequest,
-                    lessonKey: key,
-                    onMeaningfullyVisible: { request in
-                        scrollCoordinator.fulfillSidebarVisibilityRequest(request)
-                    }
-                )
+                RuntimeViewMarker(identifier: "lesson-row-\(key.id)")
                 if probesListViewport {
-                    ScrollViewportProbe(
-                        identifier: "lesson-sidebar-scroll",
-                        onResolve: { nativeSidebar.register($0) }
-                    )
+                    ScrollViewportProbe(identifier: "lesson-sidebar-scroll")
                 }
             }
         }
@@ -279,172 +232,6 @@ struct LessonListSidebar: View {
 
         return "Add, edit, reorder, or delete lessons — all inside the app"
     }
-}
-
-private enum NativeLessonRevealResult {
-    case unavailable
-    case alreadyVisible
-    case scrolled
-}
-
-@MainActor
-private final class NativeLessonSidebarController: ObservableObject {
-    private weak var scrollView: NSScrollView?
-
-    func register(_ scrollView: NSScrollView) {
-        self.scrollView = scrollView
-    }
-
-    @discardableResult
-    func reveal(
-        _ lessonKey: LessonKey,
-        orderedKeys: [LessonKey],
-        alignment: SidebarVisibilityAlignment
-    ) -> NativeLessonRevealResult {
-        guard let scrollView,
-              let documentView = scrollView.documentView,
-              let index = orderedKeys.firstIndex(of: lessonKey),
-              !orderedKeys.isEmpty
-        else { return .unavailable }
-
-        if let row = descendant(
-            named: "lesson-row-\(lessonKey.id)",
-            in: documentView
-        ) {
-            let rowFrame = row.convert(row.bounds, to: documentView)
-            let visibleHeight = rowFrame.intersection(scrollView.documentVisibleRect).height
-            if rowFrame.height > 0,
-               visibleHeight >= min(8, rowFrame.height) {
-                return .alreadyVisible
-            }
-
-            scroll(
-                scrollView,
-                to: offset(
-                    for: rowFrame,
-                    in: scrollView,
-                    alignment: alignment
-                )
-            )
-            return .scrolled
-        }
-
-        let documentHeight = documentView.bounds.height
-        let viewportHeight = scrollView.contentView.bounds.height
-        let maximumOffset = max(0, documentHeight - viewportHeight)
-        let fraction = CGFloat(index) / CGFloat(max(1, orderedKeys.count - 1))
-        scroll(scrollView, to: maximumOffset * fraction)
-        return .scrolled
-    }
-
-    private func descendant(named identifier: String, in view: NSView) -> NSView? {
-        if view.identifier?.rawValue == identifier {
-            return view
-        }
-        for child in view.subviews {
-            if let match = descendant(named: identifier, in: child) {
-                return match
-            }
-        }
-        return nil
-    }
-
-    private func offset(
-        for rowFrame: NSRect,
-        in scrollView: NSScrollView,
-        alignment: SidebarVisibilityAlignment
-    ) -> CGFloat {
-        let viewport = scrollView.documentVisibleRect
-        let maximumOffset = max(
-            0,
-            (scrollView.documentView?.bounds.height ?? 0) - viewport.height
-        )
-        let desired: CGFloat
-        switch alignment {
-        case .center:
-            desired = rowFrame.midY - (viewport.height / 2)
-        case .nearest:
-            if rowFrame.minY < viewport.minY {
-                desired = rowFrame.minY
-            } else {
-                desired = rowFrame.maxY - viewport.height
-            }
-        }
-        return min(max(0, desired), maximumOffset)
-    }
-
-    private func scroll(_ scrollView: NSScrollView, to verticalOffset: CGFloat) {
-        let current = scrollView.contentView.bounds.origin
-        scrollView.contentView.scroll(to: NSPoint(x: current.x, y: verticalOffset))
-        scrollView.reflectScrolledClipView(scrollView.contentView)
-    }
-}
-
-private struct SidebarLessonRowProbe: NSViewRepresentable {
-    let identifier: String
-    let request: SidebarVisibilityRequest?
-    let lessonKey: LessonKey
-    let onMeaningfullyVisible: @MainActor (SidebarVisibilityRequest) -> Void
-
-    func makeNSView(context: Context) -> SidebarLessonRowProbeView {
-        SidebarLessonRowProbeView(identifier: identifier)
-    }
-
-    func updateNSView(_ nsView: SidebarLessonRowProbeView, context: Context) {
-        nsView.identifier = NSUserInterfaceItemIdentifier(identifier)
-        nsView.request = request?.lessonKey == lessonKey ? request : nil
-        nsView.onMeaningfullyVisible = onMeaningfullyVisible
-        nsView.reportVisibilityAfterLayout()
-    }
-}
-
-private final class SidebarLessonRowProbeView: NSView {
-    var request: SidebarVisibilityRequest?
-    var onMeaningfullyVisible: (@MainActor (SidebarVisibilityRequest) -> Void)?
-
-    init(identifier: String) {
-        super.init(frame: .zero)
-        self.identifier = NSUserInterfaceItemIdentifier(identifier)
-        setAccessibilityElement(false)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func viewDidMoveToSuperview() {
-        super.viewDidMoveToSuperview()
-        reportVisibilityAfterLayout()
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        reportVisibilityAfterLayout()
-    }
-
-    func reportVisibilityAfterLayout() {
-        DispatchQueue.main.async { [weak self] in
-            self?.reportVisibility()
-        }
-    }
-
-    private func reportVisibility() {
-        guard let request,
-              let onMeaningfullyVisible,
-              let scrollView = self.enclosingScrollView,
-              let documentView = scrollView.documentView
-        else { return }
-
-        let rowFrame = convert(bounds, to: documentView)
-        let visibleHeight = rowFrame.intersection(scrollView.documentVisibleRect).height
-        guard rowFrame.height > 0,
-              visibleHeight >= min(8, rowFrame.height)
-        else { return }
-        onMeaningfullyVisible(request)
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 private struct SidebarLessonItem: Identifiable {

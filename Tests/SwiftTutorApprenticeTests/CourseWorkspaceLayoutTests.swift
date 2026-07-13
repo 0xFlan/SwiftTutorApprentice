@@ -536,6 +536,7 @@ final class CourseWorkspaceLayoutTests: XCTestCase {
         defer { retainWindow(rendered.window) }
 
         let sidebar = try scrollView(named: "lesson-sidebar-scroll", in: rendered.host)
+        let outline = try XCTUnwrap(nativeOutlineView(in: sidebar))
         model.selectLesson(.swift(try XCTUnwrap(lessonIDs.last)), origin: .programmatic)
         refresh(rendered.host)
         let documentHeight = sidebar.documentView?.bounds.height ?? 0
@@ -552,7 +553,8 @@ final class CourseWorkspaceLayoutTests: XCTestCase {
             "The regression setup must leave the sidebar manually scrolled near the bottom."
         )
 
-        model.selectLesson(.swift(firstID), origin: .direct)
+        let firstRowIndex = try XCTUnwrap(lessonIDs.firstIndex(of: firstID)) + 1
+        outline.selectRowIndexes(IndexSet(integer: firstRowIndex), byExtendingSelection: false)
         refresh(rendered.host)
         let firstRowCandidate = waitForMarker(
             named: "lesson-row-\(LessonKey.swift(firstID).id)",
@@ -569,7 +571,8 @@ final class CourseWorkspaceLayoutTests: XCTestCase {
         )
 
         let originAfterFirstSelection = sidebar.contentView.bounds.origin
-        model.selectLesson(.swift(secondID), origin: .direct)
+        let secondRowIndex = try XCTUnwrap(lessonIDs.firstIndex(of: secondID)) + 1
+        outline.selectRowIndexes(IndexSet(integer: secondRowIndex), byExtendingSelection: false)
         refresh(rendered.host)
         let secondRow = try XCTUnwrap(waitForMarker(
             named: "lesson-row-\(LessonKey.swift(secondID).id)",
@@ -774,6 +777,18 @@ final class CourseWorkspaceLayoutTests: XCTestCase {
             matches.append(contentsOf: descendantScrollViews(in: child))
         }
         return matches
+    }
+
+    private func nativeOutlineView(in view: NSView) -> NSOutlineView? {
+        if let outline = view as? NSOutlineView {
+            return outline
+        }
+        for child in view.subviews {
+            if let outline = nativeOutlineView(in: child) {
+                return outline
+            }
+        }
+        return nil
     }
 
     private func frame<Content: View>(
