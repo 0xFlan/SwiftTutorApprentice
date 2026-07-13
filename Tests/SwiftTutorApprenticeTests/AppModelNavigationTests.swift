@@ -358,7 +358,7 @@ final class AppModelNavigationTests: XCTestCase {
         XCTAssertEqual(nestedCount, 1)
 
         var token: WorkspaceCaptureToken? = WorkspaceCaptureToken()
-        weak let weakToken = token
+        weak var weakToken = token
         _ = model.registerWorkspaceCancellation { [token] in _ = token }
         token = nil
         XCTAssertNotNil(weakToken)
