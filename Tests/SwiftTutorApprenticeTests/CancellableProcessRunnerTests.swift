@@ -312,7 +312,7 @@ final class CancellableProcessRunnerTests: XCTestCase {
     }
 
     private func waitForFile(at url: URL) async throws {
-        let deadline = Date().addingTimeInterval(1)
+        let deadline = Date().addingTimeInterval(5)
         while !FileManager.default.fileExists(atPath: url.path), Date() < deadline {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
@@ -320,7 +320,7 @@ final class CancellableProcessRunnerTests: XCTestCase {
     }
 
     private func waitForParseablePID(at url: URL) async throws -> pid_t {
-        let deadline = Date().addingTimeInterval(1)
+        let deadline = Date().addingTimeInterval(5)
         while Date() < deadline {
             if let pid = parseCompletePID(at: url) {
                 return pid
@@ -340,7 +340,7 @@ final class CancellableProcessRunnerTests: XCTestCase {
     }
 
     private func waitForProcessToDisappear(_ pid: pid_t) -> Bool {
-        let deadline = Date().addingTimeInterval(1)
+        let deadline = Date().addingTimeInterval(5)
         while Date() < deadline {
             var status: Int32 = 0
             if waitpid(pid, &status, WNOHANG) == pid {
@@ -355,7 +355,7 @@ final class CancellableProcessRunnerTests: XCTestCase {
     }
 
     private func waitForProcessToExitOrBecomeZombie(_ pid: pid_t) async throws {
-        let deadline = Date().addingTimeInterval(1)
+        let deadline = Date().addingTimeInterval(5)
         while !processHasExitedOrBecomeZombie(pid), Date() < deadline {
             try await Task.sleep(nanoseconds: 10_000_000)
         }

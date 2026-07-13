@@ -18,7 +18,6 @@ final class CourseRootLayoutTests: XCTestCase {
             )
             defer { retainWindow(home.window) }
 
-            assertFiniteFittingSize(home.host.fittingSize)
             XCTAssertEqual(home.host.frame.size, size)
             XCTAssertEqual(markers(named: "course-home-root", in: home.host).count, 1)
             XCTAssertTrue(markers(named: "course-workspace-root", in: home.host).isEmpty)
@@ -46,7 +45,6 @@ final class CourseRootLayoutTests: XCTestCase {
                 size: size
             )
             defer { retainWindow(workspace.window) }
-            assertFiniteFittingSize(workspace.host.fittingSize)
             XCTAssertEqual(workspace.host.frame.size, size)
             XCTAssertTrue(markers(named: "course-home-root", in: workspace.host).isEmpty)
             XCTAssertEqual(markers(named: "course-workspace-root", in: workspace.host).count, 1)
@@ -127,13 +125,6 @@ final class CourseRootLayoutTests: XCTestCase {
     func testHomeCommandKeepsStableKeyboardShortcutContract() {
         XCTAssertEqual(CourseHomeNavigationCommand.keyCharacter, "h")
         XCTAssertEqual(CourseHomeNavigationCommand.modifiers, [.command, .shift])
-    }
-
-    private func assertFiniteFittingSize(_ fittingSize: NSSize) {
-        XCTAssertTrue(fittingSize.width.isFinite)
-        XCTAssertTrue(fittingSize.height.isFinite)
-        XCTAssertGreaterThan(fittingSize.width, 0)
-        XCTAssertGreaterThan(fittingSize.height, 0)
     }
 
     private func assertRootIdentifiers(

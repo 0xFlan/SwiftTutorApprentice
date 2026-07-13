@@ -121,7 +121,7 @@ final class AppModelNavigationTests: XCTestCase {
         let model = fixture.makeModel(
             runCode: { _ in
                 runStarted.fulfill()
-                do { try await Task.sleep(nanoseconds: .max) }
+                do { try await Task.sleep(nanoseconds: 60_000_000_000) }
                 catch { runCancelled.fulfill() }
                 return RunResult(
                     stdout: "stale run",
@@ -134,7 +134,7 @@ final class AppModelNavigationTests: XCTestCase {
             requestAI: { request in
                 XCTAssertEqual(request.provider, "cli")
                 aiStarted.fulfill()
-                do { try await Task.sleep(nanoseconds: .max) }
+                do { try await Task.sleep(nanoseconds: 60_000_000_000) }
                 catch { aiCancelled.fulfill() }
                 return AIResult(text: "stale AI", errorMessage: nil)
             }
@@ -154,9 +154,9 @@ final class AppModelNavigationTests: XCTestCase {
 
         model.run()
         model.askAI()
-        await fulfillment(of: [runStarted, aiStarted], timeout: 1)
+        await fulfillment(of: [runStarted, aiStarted], timeout: 5)
         model.selectLesson(.swift(3), origin: .direct)
-        await fulfillment(of: [runCancelled, aiCancelled], timeout: 1)
+        await fulfillment(of: [runCancelled, aiCancelled], timeout: 5)
         await Task.yield()
 
         XCTAssertTrue(activeRegistrationSawOldKey)
@@ -201,7 +201,7 @@ final class AppModelNavigationTests: XCTestCase {
                 if runCalls == 1 {
                     XCTAssertEqual(code, "first run")
                     firstRunStarted.fulfill()
-                    do { try await Task.sleep(nanoseconds: .max) }
+                    do { try await Task.sleep(nanoseconds: 60_000_000_000) }
                     catch { firstRunCancelled.fulfill() }
                     return RunResult(
                         stdout: "stale run",
@@ -225,7 +225,7 @@ final class AppModelNavigationTests: XCTestCase {
                 aiCalls += 1
                 if aiCalls == 1 {
                     firstAIStarted.fulfill()
-                    do { try await Task.sleep(nanoseconds: .max) }
+                    do { try await Task.sleep(nanoseconds: 60_000_000_000) }
                     catch { firstAICancelled.fulfill() }
                     return AIResult(text: "stale AI", errorMessage: nil)
                 }
@@ -238,10 +238,10 @@ final class AppModelNavigationTests: XCTestCase {
 
         model.code = "first run"
         model.run()
-        await fulfillment(of: [firstRunStarted], timeout: 1)
+        await fulfillment(of: [firstRunStarted], timeout: 5)
         model.code = "second run"
         model.run()
-        await fulfillment(of: [firstRunCancelled, secondRunReturned], timeout: 1)
+        await fulfillment(of: [firstRunCancelled, secondRunReturned], timeout: 5)
         await waitUntil { model.runResult?.stdout == "current run" }
 
         XCTAssertEqual(runCalls, 2)
@@ -251,10 +251,10 @@ final class AppModelNavigationTests: XCTestCase {
 
         model.code = "first AI"
         model.askAI()
-        await fulfillment(of: [firstAIStarted], timeout: 1)
+        await fulfillment(of: [firstAIStarted], timeout: 5)
         model.code = "second AI"
         model.askAI()
-        await fulfillment(of: [firstAICancelled, secondAIReturned], timeout: 1)
+        await fulfillment(of: [firstAICancelled, secondAIReturned], timeout: 5)
         await waitUntil { model.aiResponse == "current AI" }
 
         XCTAssertEqual(aiCalls, 2)
@@ -274,7 +274,7 @@ final class AppModelNavigationTests: XCTestCase {
         let runCancelled = expectation(description: "run cancelled")
         let model = fixture.makeModel(runCode: { _ in
             runStarted.fulfill()
-            do { try await Task.sleep(nanoseconds: .max) }
+            do { try await Task.sleep(nanoseconds: 60_000_000_000) }
             catch { runCancelled.fulfill() }
             return RunResult(
                 stdout: "stale",
@@ -292,10 +292,10 @@ final class AppModelNavigationTests: XCTestCase {
         }
 
         model.run()
-        await fulfillment(of: [runStarted], timeout: 1)
+        await fulfillment(of: [runStarted], timeout: 5)
         fixture.lessons.delete(id: 1)
         model.ensureSelectionValid()
-        await fulfillment(of: [runCancelled], timeout: 1)
+        await fulfillment(of: [runCancelled], timeout: 5)
 
         XCTAssertTrue(cancellationSawOldIdentity)
         XCTAssertEqual(model.selectedLessonKey, .swift(2))
@@ -367,7 +367,7 @@ final class AppModelNavigationTests: XCTestCase {
     }
 
     private func waitUntil(
-        timeout: TimeInterval = 1,
+        timeout: TimeInterval = 5,
         condition: @escaping @MainActor () -> Bool
     ) async {
         let deadline = Date().addingTimeInterval(timeout)

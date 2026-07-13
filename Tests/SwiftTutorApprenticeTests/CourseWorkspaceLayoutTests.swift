@@ -554,9 +554,10 @@ final class CourseWorkspaceLayoutTests: XCTestCase {
 
         model.selectLesson(.swift(firstID), origin: .direct)
         refresh(rendered.host)
-        let firstRow = try XCTUnwrap(
-            markers(named: "lesson-row-\(LessonKey.swift(firstID).id)", in: rendered.host).first
-        )
+        let firstRow = try XCTUnwrap(waitForMarker(
+            named: "lesson-row-\(LessonKey.swift(firstID).id)",
+            in: rendered.host
+        ))
         XCTAssertTrue(
             isMeaningfullyVisible(firstRow, in: sidebar),
             "A direct keyboard-style selection of far-off Lesson 1 must minimally reveal it. \(visibilityDiagnostics(firstRow, in: sidebar))"
@@ -565,9 +566,10 @@ final class CourseWorkspaceLayoutTests: XCTestCase {
         let originAfterFirstSelection = sidebar.contentView.bounds.origin
         model.selectLesson(.swift(secondID), origin: .direct)
         refresh(rendered.host)
-        let secondRow = try XCTUnwrap(
-            markers(named: "lesson-row-\(LessonKey.swift(secondID).id)", in: rendered.host).first
-        )
+        let secondRow = try XCTUnwrap(waitForMarker(
+            named: "lesson-row-\(LessonKey.swift(secondID).id)",
+            in: rendered.host
+        ))
         XCTAssertTrue(
             isMeaningfullyVisible(secondRow, in: sidebar),
             "The next direct keyboard-style selection must keep Lesson 2 visible. \(visibilityDiagnostics(secondRow, in: sidebar))"
@@ -710,6 +712,21 @@ final class CourseWorkspaceLayoutTests: XCTestCase {
             RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.03))
         }
         view.layoutSubtreeIfNeeded()
+    }
+
+    private func waitForMarker(
+        named identifier: String,
+        in view: NSView,
+        timeout: TimeInterval = 5
+    ) -> NSView? {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            refresh(view)
+            if let marker = markers(named: identifier, in: view).first {
+                return marker
+            }
+        } while Date() < deadline
+        return nil
     }
 
     private func markers(named identifier: String, in view: NSView) -> [NSView] {
