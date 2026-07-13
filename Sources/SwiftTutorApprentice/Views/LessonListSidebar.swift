@@ -78,6 +78,17 @@ struct LessonListSidebar: View {
                     }
                 }
                 .listStyle(.sidebar)
+                .onChange(of: scrollCoordinator.sidebarVisibilityRequest) { _, request in
+                    guard let request else { return }
+                    let result = nativeSidebar.reveal(
+                        request.lessonKey,
+                        orderedKeys: sidebarLessons.map(\.id),
+                        alignment: request.alignment
+                    )
+                    if result == .alreadyVisible {
+                        scrollCoordinator.fulfillSidebarVisibilityRequest(request)
+                    }
+                }
                 .task(id: scrollCoordinator.sidebarVisibilityRequest?.id) {
                     guard let request = scrollCoordinator.sidebarVisibilityRequest else {
                         return
