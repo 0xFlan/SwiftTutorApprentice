@@ -13,6 +13,7 @@ struct LessonListSidebar: View {
     @ObservedObject var store: LessonStore
     @ObservedObject var progress: ProgressStore
     @ObservedObject var scrollCoordinator: LessonScrollCoordinator
+    @StateObject private var nativeSidebar = NativeLessonSidebarController()
 
     /// Called when the learner taps the "Manage lessons" button.
     let onManageLessons: () -> Void
@@ -85,10 +86,24 @@ struct LessonListSidebar: View {
                     guard !Task.isCancelled,
                           scrollCoordinator.sidebarVisibilityRequest == request
                     else { return }
+                    let lessonKeys = sidebarLessons.map(\.id)
                     switch request.alignment {
                     case .center:
+                        nativeSidebar.reveal(
+                            request.lessonKey,
+                            orderedKeys: lessonKeys,
+                            alignment: .center
+                        )
                         proxy.scrollTo(request.lessonKey, anchor: .center)
                     case .nearest:
+                        if nativeSidebar.reveal(
+                            request.lessonKey,
+                            orderedKeys: lessonKeys,
+                            alignment: .nearest
+                        ) == .alreadyVisible {
+                            scrollCoordinator.fulfillSidebarVisibilityRequest(request)
+                            return
+                        }
                         proxy.scrollTo(request.lessonKey)
                         // macOS 14 can ignore an unanchored List scroll when
                         // the destination row has not been mounted yet. Give
@@ -99,6 +114,11 @@ struct LessonListSidebar: View {
                         guard !Task.isCancelled,
                               scrollCoordinator.sidebarVisibilityRequest == request
                         else { return }
+                        nativeSidebar.reveal(
+                            request.lessonKey,
+                            orderedKeys: lessonKeys,
+                            alignment: .center
+                        )
                         proxy.scrollTo(request.lessonKey, anchor: .center)
                     }
                 }
@@ -214,7 +234,10 @@ struct LessonListSidebar: View {
                     }
                 )
                 if probesListViewport {
-                    ScrollViewportProbe(identifier: "lesson-sidebar-scroll")
+                    ScrollViewportProbe(
+                        identifier: "lesson-sidebar-scroll",
+                        onResolve: { nativeSidebar.register($0) }
+                    )
                 }
             }
         }
@@ -244,6 +267,105 @@ struct LessonListSidebar: View {
         }
 
         return "Add, edit, reorder, or delete lessons — all inside the app"
+    }
+}
+
+private enum NativeLessonRevealResult {
+    case unavailable
+    case alreadyVisible
+    case scrolled
+}
+
+@MainActor
+private final class NativeLessonSidebarController: ObservableObject {
+    private weak var scrollView: NSScrollView?
+
+    func register(_ scrollView: NSScrollView) {
+        self.scrollView = scrollView
+    }
+
+    @discardableResult
+    func reveal(
+        _ lessonKey: LessonKey,
+        orderedKeys: [LessonKey],
+        alignment: SidebarVisibilityAlignment
+    ) -> NativeLessonRevealResult {
+        guard let scrollView,
+              let documentView = scrollView.documentView,
+              let index = orderedKeys.firstIndex(of: lessonKey),
+              !orderedKeys.isEmpty
+        else { return .unavailable }
+
+        if let row = descendant(
+            named: "lesson-row-\(lessonKey.id)",
+            in: documentView
+        ) {
+            let rowFrame = row.convert(row.bounds, to: documentView)
+            let visibleHeight = rowFrame.intersection(scrollView.documentVisibleRect).height
+            if rowFrame.height > 0,
+               visibleHeight >= min(8, rowFrame.height) {
+                return .alreadyVisible
+            }
+
+            scroll(
+                scrollView,
+                to: offset(
+                    for: rowFrame,
+                    in: scrollView,
+                    alignment: alignment
+                )
+            )
+            return .scrolled
+        }
+
+        let documentHeight = documentView.bounds.height
+        let viewportHeight = scrollView.contentView.bounds.height
+        let maximumOffset = max(0, documentHeight - viewportHeight)
+        let fraction = CGFloat(index) / CGFloat(max(1, orderedKeys.count - 1))
+        scroll(scrollView, to: maximumOffset * fraction)
+        return .scrolled
+    }
+
+    private func descendant(named identifier: String, in view: NSView) -> NSView? {
+        if view.identifier?.rawValue == identifier {
+            return view
+        }
+        for child in view.subviews {
+            if let match = descendant(named: identifier, in: child) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private func offset(
+        for rowFrame: NSRect,
+        in scrollView: NSScrollView,
+        alignment: SidebarVisibilityAlignment
+    ) -> CGFloat {
+        let viewport = scrollView.documentVisibleRect
+        let maximumOffset = max(
+            0,
+            (scrollView.documentView?.bounds.height ?? 0) - viewport.height
+        )
+        let desired: CGFloat
+        switch alignment {
+        case .center:
+            desired = rowFrame.midY - (viewport.height / 2)
+        case .nearest:
+            if rowFrame.minY < viewport.minY {
+                desired = rowFrame.minY
+            } else {
+                desired = rowFrame.maxY - viewport.height
+            }
+        }
+        return min(max(0, desired), maximumOffset)
+    }
+
+    private func scroll(_ scrollView: NSScrollView, to verticalOffset: CGFloat) {
+        let current = scrollView.contentView.bounds.origin
+        scrollView.contentView.scroll(to: NSPoint(x: current.x, y: verticalOffset))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
     }
 }
 

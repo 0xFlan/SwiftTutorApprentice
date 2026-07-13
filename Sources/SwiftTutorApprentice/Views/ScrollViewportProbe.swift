@@ -6,22 +6,37 @@ import SwiftUI
 /// scroll position.
 struct ScrollViewportProbe: NSViewRepresentable {
     let identifier: String
+    let onResolve: (@MainActor (NSScrollView) -> Void)?
+
+    init(
+        identifier: String,
+        onResolve: (@MainActor (NSScrollView) -> Void)? = nil
+    ) {
+        self.identifier = identifier
+        self.onResolve = onResolve
+    }
 
     func makeNSView(context: Context) -> ScrollViewportProbeView {
-        ScrollViewportProbeView(identifier: identifier)
+        ScrollViewportProbeView(identifier: identifier, onResolve: onResolve)
     }
 
     func updateNSView(_ nsView: ScrollViewportProbeView, context: Context) {
         nsView.viewportIdentifier = identifier
+        nsView.onResolve = onResolve
         nsView.tagNearestScrollView()
     }
 }
 
 final class ScrollViewportProbeView: NSView {
     var viewportIdentifier: String
+    var onResolve: (@MainActor (NSScrollView) -> Void)?
 
-    init(identifier: String) {
+    init(
+        identifier: String,
+        onResolve: (@MainActor (NSScrollView) -> Void)? = nil
+    ) {
         viewportIdentifier = identifier
+        self.onResolve = onResolve
         super.init(frame: .zero)
         setAccessibilityElement(false)
     }
@@ -49,6 +64,7 @@ final class ScrollViewportProbeView: NSView {
         while let view = ancestor {
             if let scrollView = view as? NSScrollView {
                 scrollView.identifier = NSUserInterfaceItemIdentifier(viewportIdentifier)
+                onResolve?(scrollView)
                 return
             }
             ancestor = view.superview
