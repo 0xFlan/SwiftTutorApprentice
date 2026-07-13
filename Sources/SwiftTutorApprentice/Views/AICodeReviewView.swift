@@ -45,6 +45,7 @@ final class AICodeReviewSession: ObservableObject {
     }
 }
 
+@MainActor
 struct AICodeReviewView: View {
     let exercise: AICodeReviewExercise
     let onSubmit: (AICodeReviewEvaluation) -> Void
