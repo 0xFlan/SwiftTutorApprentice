@@ -11,10 +11,13 @@ This file grounds the app's pedagogy in evidence and sequences the roadmap.
    experiment, 493 students aged 11–14 across 13 schools, PRIMM group beat
    control on a programming post-test. *Source: Sentance, Waite & Kallia 2019
    (ERIC EJ1217966).*
-   - **App fit:** Predict and Run are implemented, and the walkthrough supports
-     Investigate. Built-in Lessons 1–3 now pilot explicit **Modify** by handing
-     the learner working code plus one guided change and an output prediction.
-     Free-coding (**Make**) remains a later step.
+   - **App fit:** Predict and Run are implemented, and the animated player plus
+     Syntax Lens support Investigate. Built-in Lessons 1–3 now present a paused
+     visual explanation,
+     then hand off through Recall to explicit **Modify** with working code, one
+     guided change, and an output prediction. Practice/Run supplies the current
+     independent coding step; broader free-coding (**Make**) remains later
+     program work.
 
 2. **Parsons problems (arrange scrambled code lines)** — ~30% faster practice
    than fixing/writing code with no learning loss (473s vs 679s; F(2,133)=10.8,
@@ -35,7 +38,7 @@ This file grounds the app's pedagogy in evidence and sequences the roadmap.
    - **App fit:** the Find the bug baseline is implemented for injectable code
      lessons: the learner explains an injected mistake, then reveals stored
      feedback or loads the broken code into the editor. Guided "why is this line
-     needed?" walkthrough questions remain a possible enhancement.
+     needed?" player questions remain a possible enhancement.
 
 4. **Cognitive Load Theory** — keep intrinsic load appropriate, minimise
    extraneous load; unfamiliar terminology itself raises load for novices.
@@ -51,7 +54,7 @@ This file grounds the app's pedagogy in evidence and sequences the roadmap.
    so **fade conservatively**. *Sources: Tetzlaff et al. 2025; Kalyuga 2007.*
    - **App fit:** a per-concept proficiency signal that, as it rises, shifts
      entry worked-example → Parsons → free coding and lets the learner collapse
-     the syntax lens / walkthrough / coach. Make all scaffolds toggleable.
+     the syntax lens / player / coach. Make all scaffolds toggleable.
 
 ## Confirmed (medium confidence — domain caveat)
 
@@ -72,25 +75,54 @@ This file grounds the app's pedagogy in evidence and sequences the roadmap.
 
 ## Current pilot alignment
 
-The built-in Lessons 1–3 pilot is a bounded application of the rationale above.
-Its concept-first segments, working examples, wrong variants, Syntax Microscope,
-and recall map to PRIMM's Investigate phase before the guided Modify task. Short
-one-concept segments and explicit **Required by Swift** / **Convention** /
-**Depends on context** labels apply the documented cognitive-load rationale
-around terminology and extraneous load. This is an implementation mapping, not
-a claim that the app itself has measured learning effects.
+Milestone 1 is a bounded Swift Lessons 1–3 pilot, not evidence that every future
+course or certification program is ready. Its embedded offline presentation is
+first and paused in one stable 16:9 player, with authored state changes,
+captions, an internal transcript, optional local narration, Reduce Motion,
+keyboard, and VoiceOver support. The player scrolls away with the lesson and
+does not move or lock the practice workspace. It hands off
+through **Watch → Recall → Modify → Practice/Run**. The optional written
+**Read deeper** material preserves the concept-first segments, working examples,
+wrong variants, Syntax Microscope, and **Required by Swift** / **Convention** /
+**Depends on context** labels without auto-opening.
+
+This is an implementation mapping, not a measured learning-effect claim.
+Opening, watching, replaying, skipping, or completing a presentation records
+viewing/player state only. It is not lesson completion, mastery, course
+completion, or certification readiness. Current lesson completion still means
+a successful Run matching the expected output. Future mastery and readiness
+require the program's separately specified repeated independent, delayed, and
+assessment evidence; completion and readiness remain distinct.
+
+The pilot's **Understand AI Code** exercises are deterministic local claim-review
+activities. Only a submitted answer set creates a local course-scoped attempt;
+opening the exercise or choosing answers does not. These submissions do not call
+the optional remote AI coach, do not establish mastery by themselves, and are
+not evidence that remote AI evaluated the learner.
+
+Progress and migration remain private and local. Existing Swift completion,
+Deep Lesson, Recall, Modify, custom-lesson, settings, and workspace state are
+preserved, while presentation activity remains a separate record. The protected
+exact-bundle, migration, accessibility, and layout checks are recorded
+in the [Milestone 1 smoke evidence](testing/course-platform-milestone-1-smoke.md).
 
 ## Roadmap (evidence-ranked)
-1. **Implemented:** Parsons practice for eligible multi-line lessons
+1. **Implemented:** Parsons practice for eligible multi-line lessons.
 2. **Implemented:** Find the bug / self-explanation baseline for injectable code
-   lessons
-3. **Pilot implemented:** Explicit Modify for built-in Lessons 1–3; full
-   curriculum coverage remains deferred
-4. **Deferred:** Per-concept proficiency + fadeable scaffolds (expertise
-   reversal)
-5. **Deferred:** Spaced varied-cue review mode beyond Deep Lesson Pilot v1
-6. **Deferred:** Inline glossary auto-linking + prerequisite gating (CLT) beyond
-   Deep Lesson Pilot v1
+   lessons.
+3. **Pilot implemented:** Offline presentation, Recall, explicit Modify, local
+   AI-code review, and Practice/Run for built-in Swift Lessons 1–3. Full Swift
+   coverage remains future work.
+4. **Future approved program:** Complete Swift, Web, Cybersecurity, and
+   Networking instruction and assessment, with presentations, projects, mock
+   exams, capstones, and Understand AI Code exercises throughout.
+5. **Deferred:** Per-concept proficiency + fadeable scaffolds (expertise
+   reversal).
+6. **Deferred:** Spaced varied-cue review across courses.
+7. **Deferred:** Inline glossary auto-linking + prerequisite gating.
+8. **Future end state:** Objective-level certification-readiness reporting from
+   repeated independent evidence. This is not a present guarantee of readiness
+   or an external exam outcome.
 
 _Split votes (2-1) and single-study / non-programming caveats are noted per
 finding; treat exact effect sizes as indicative, not definitive._

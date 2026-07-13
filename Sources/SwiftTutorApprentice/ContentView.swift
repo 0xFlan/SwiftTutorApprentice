@@ -1,51 +1,43 @@
 // ContentView.swift
 // ------------------------------------------------------------
-// The top-level layout. A NavigationSplitView gives us a native
-// Mac sidebar (the lesson list) next to the main work area.
+// The top-level route. Course Home and the course workspace have
+// separate identities so navigation never reuses stale split-view
+// or scroll state between them.
 //
-//   ┌──────────┬───────────────────────────────────────────┐
-//   │ Lessons  │  Lesson │ Code Editor │ Live Coach          │
-//   │ sidebar  │  ────────────────────────────────────────  │
-//   │          │  Prediction + Run Output                    │
-//   └──────────┴───────────────────────────────────────────┘
+//   Course Home  ──open──▶  Course Workspace
+//       ▲                         │
+//       └──────── Home ───────────┘
 //
 // The AppModel owns all the shared state; this view wires the
-// pieces together and hosts the in-app lesson editor sheet.
+// root together and owns the one-time welcome sheet.
 // ------------------------------------------------------------
 
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var model = AppModel()
-    @State private var showingLessonEditor = false
-    @State private var showingSettings = false
+    @StateObject private var model: AppModel
     @State private var showingWelcome = false
     @State private var canPresentLearningStages = false
 
+    init() {
+        _model = StateObject(wrappedValue: AppModel())
+    }
+
+    init(model: AppModel) {
+        _model = StateObject(wrappedValue: model)
+    }
+
     var body: some View {
-        NavigationSplitView {
-            LessonListSidebar(
-                model: model,
-                store: model.store,
-                progress: model.progress,
-                onManageLessons: {
-                    canPresentLearningStages = false
-                    showingLessonEditor = true
-                },
-                onOpenSettings: {
-                    canPresentLearningStages = false
-                    showingSettings = true
-                }
-            )
-        } detail: {
-            LessonWorkspace(
-                model: model,
-                settings: model.settings,
-                progress: model.progress,
-                canPresentLearningStages: canPresentLearningStages
-            )
-                .navigationTitle("SwiftTutor Apprentice")
-                .navigationSubtitle("Lesson \(model.currentDisplayNumber): \(model.currentLesson.title)")
+        Group {
+            switch model.route {
+            case .courseHome:
+                CourseHomeView(model: model)
+            case .course:
+                CourseWorkspaceView(
+                    model: model,
+                    canPresentLearningStages: canPresentLearningStages
+                )
+            }
         }
         .frame(minWidth: 680, minHeight: 520)
         // Parent sheets own the learning-stage lifecycle gate. Stage sheets
@@ -63,22 +55,6 @@ struct ContentView: View {
                 showingWelcome = false
             })
             .interactiveDismissDisabled()
-        }
-        // The in-app lesson editor: create/edit/reorder/delete lessons.
-        .sheet(isPresented: $showingLessonEditor, onDismiss: {
-            canPresentLearningStages = true
-        }) {
-            LessonEditorView(store: model.store, initialSelection: model.selectedLessonID)
-        }
-        // In-app settings (including the optional AI coach).
-        .sheet(isPresented: $showingSettings, onDismiss: {
-            canPresentLearningStages = true
-        }) {
-            SettingsView(settings: model.settings)
-        }
-        // If lessons changed while editing, keep the selection valid.
-        .onChange(of: model.store.lessons) {
-            model.ensureSelectionValid()
         }
     }
 }

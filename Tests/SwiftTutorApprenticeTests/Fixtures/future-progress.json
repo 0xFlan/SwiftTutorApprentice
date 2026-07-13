@@ -1,0 +1,15 @@
+{
+  "version": 4,
+  "payload": {
+    "storage": "course-graph-v4",
+    "courses": [
+      {
+        "identifier": {
+          "namespace": "future",
+          "value": 901
+        },
+        "opaqueProgress": "This payload is intentionally incompatible with version 3."
+      }
+    ]
+  }
+}

@@ -3,6 +3,128 @@ import XCTest
 @testable import SwiftTutorApprentice
 
 final class LessonCompatibilityTests: XCTestCase {
+    func testLiteralFuturePresentationFixturePreservesBaseLesson() throws {
+        let fixtureURL = try XCTUnwrap(
+            Bundle.module.url(
+                forResource: "future-presentation-lessons",
+                withExtension: "json",
+                subdirectory: "Fixtures"
+            )
+        )
+        let fixtureBytes = try Data(contentsOf: fixtureURL)
+
+        let lessons = try JSONDecoder().decode([Lesson].self, from: fixtureBytes)
+        let lesson = try XCTUnwrap(lessons.first)
+
+        XCTAssertEqual(lessons.count, 1)
+        XCTAssertEqual(lesson.title, "Future presentation lesson")
+        XCTAssertEqual(lesson.starterCode, "print(\"Future-safe\")")
+        XCTAssertNil(lesson.presentation)
+        XCTAssertTrue(lesson.hasUnsupportedPresentation)
+        XCTAssertFalse(lesson.hasUnsupportedDeepContent)
+        XCTAssertEqual(try Data(contentsOf: fixtureURL), fixtureBytes)
+    }
+
+    func testPresentationMissingIsSupportedAndKeepsBaseLessonReadable() throws {
+        let data = try lessonData(id: 301)
+
+        let lesson = try XCTUnwrap(JSONDecoder().decode([Lesson].self, from: data).first)
+
+        assertBaseFieldsAreReadable(lesson, id: 301)
+        XCTAssertNil(lesson.presentation)
+        XCTAssertFalse(lesson.hasUnsupportedPresentation)
+    }
+
+    func testPresentationNullIsSupported() throws {
+        var object = lessonJSONObject(id: 302)
+        object["presentation"] = NSNull()
+        let data = try JSONSerialization.data(withJSONObject: [object])
+
+        let lesson = try XCTUnwrap(JSONDecoder().decode([Lesson].self, from: data).first)
+
+        assertBaseFieldsAreReadable(lesson, id: 302)
+        XCTAssertNil(lesson.presentation)
+        XCTAssertFalse(lesson.hasUnsupportedPresentation)
+    }
+
+    func testPresentationCurrentSchemaRoundTrips() throws {
+        let presentation = makePresentation()
+        var object = lessonJSONObject(id: 303)
+        object["presentation"] = try jsonObject(for: presentation)
+        let data = try JSONSerialization.data(withJSONObject: [object])
+
+        let lesson = try XCTUnwrap(JSONDecoder().decode([Lesson].self, from: data).first)
+        let roundTripped = try JSONDecoder().decode(
+            Lesson.self,
+            from: JSONEncoder().encode(lesson)
+        )
+
+        assertBaseFieldsAreReadable(roundTripped, id: 303)
+        XCTAssertEqual(roundTripped.presentation, presentation)
+        XCTAssertFalse(roundTripped.hasUnsupportedPresentation)
+        XCTAssertFalse(roundTripped.hasUnsupportedDeepContent)
+
+        let encodedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(lesson)) as? [String: Any]
+        )
+        XCTAssertNil(encodedObject["hasUnsupportedPresentation"])
+        XCTAssertEqual(
+            (encodedObject["presentation"] as? [String: Any])?["schemaVersion"] as? Int,
+            1
+        )
+    }
+
+    func testPresentationMalformedIsIsolatedFromBaseLessonAndDeepDiagnostic() throws {
+        var object = lessonJSONObject(id: 304)
+        object["presentation"] = [
+            "schemaVersion": 1,
+            "id": "malformed-presentation",
+            "title": 42
+        ]
+        let data = try JSONSerialization.data(withJSONObject: [object])
+
+        let lesson = try XCTUnwrap(JSONDecoder().decode([Lesson].self, from: data).first)
+
+        assertBaseFieldsAreReadable(lesson, id: 304)
+        XCTAssertNil(lesson.presentation)
+        XCTAssertTrue(lesson.hasUnsupportedPresentation)
+        XCTAssertFalse(lesson.hasUnsupportedDeepContent)
+    }
+
+    func testPresentationFutureSchemaIsIsolatedFromBaseLessonAndDeepDiagnostic() throws {
+        var future = try jsonObject(for: makePresentation())
+        future["schemaVersion"] = 2
+        future["futureAnimationTimeline"] = ["keyframes": [0, 1, 2]]
+        var object = lessonJSONObject(id: 305)
+        object["presentation"] = future
+        let data = try JSONSerialization.data(withJSONObject: [object])
+
+        let lesson = try XCTUnwrap(JSONDecoder().decode([Lesson].self, from: data).first)
+
+        assertBaseFieldsAreReadable(lesson, id: 305)
+        XCTAssertNil(lesson.presentation)
+        XCTAssertTrue(lesson.hasUnsupportedPresentation)
+        XCTAssertFalse(lesson.hasUnsupportedDeepContent)
+    }
+
+    func testPresentationDiagnosticStaysIndependentWhenDeepContentIsMalformed() throws {
+        let malformedDeepContent: [String: Any] = [
+            "schemaVersion": 1,
+            "title": 42
+        ]
+        var object = lessonJSONObject(id: 306, deepContent: malformedDeepContent)
+        object["presentation"] = try jsonObject(for: makePresentation())
+        let data = try JSONSerialization.data(withJSONObject: [object])
+
+        let lesson = try XCTUnwrap(JSONDecoder().decode([Lesson].self, from: data).first)
+
+        assertBaseFieldsAreReadable(lesson, id: 306)
+        XCTAssertNil(lesson.deepContent)
+        XCTAssertTrue(lesson.hasUnsupportedDeepContent)
+        XCTAssertEqual(lesson.presentation, makePresentation())
+        XCTAssertFalse(lesson.hasUnsupportedPresentation)
+    }
+
     func testLegacyLessonWithoutKindOrDeepContentPreservesEveryField() throws {
         let lessons = try JSONDecoder().decode([Lesson].self, from: legacyLessonsFixtureData())
         let lesson = try XCTUnwrap(lessons.first)
@@ -272,6 +394,83 @@ final class LessonCompatibilityTests: XCTestCase {
     private func lessonData(id: Int, deepContent: Any? = nil) throws -> Data {
         try JSONSerialization.data(
             withJSONObject: [lessonJSONObject(id: id, deepContent: deepContent)]
+        )
+    }
+
+    private func jsonObject<T: Encodable>(for value: T) throws -> [String: Any] {
+        try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(value)) as? [String: Any]
+        )
+    }
+
+    private func assertBaseFieldsAreReadable(
+        _ lesson: Lesson,
+        id: Int,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(lesson.id, id, file: file, line: line)
+        XCTAssertEqual(lesson.title, "Legacy custom lesson", file: file, line: line)
+        XCTAssertEqual(lesson.goal, "Keep decoding", file: file, line: line)
+        XCTAssertEqual(lesson.starterCode, "print(\"Legacy\")", file: file, line: line)
+        XCTAssertEqual(lesson.teaches, ["print"], file: file, line: line)
+        XCTAssertEqual(lesson.glossaryTerms, ["String"], file: file, line: line)
+        XCTAssertEqual(lesson.syntaxTokens, [], file: file, line: line)
+        XCTAssertEqual(lesson.syntaxWhy, "Legacy syntax note", file: file, line: line)
+        XCTAssertEqual(lesson.expectedOutput, "Legacy", file: file, line: line)
+        XCTAssertEqual(lesson.successMarkers, ["print("], file: file, line: line)
+        XCTAssertEqual(lesson.successMessage, "Legacy success message", file: file, line: line)
+        XCTAssertEqual(lesson.hint, "Legacy hint", file: file, line: line)
+        XCTAssertEqual(lesson.kind, .code, file: file, line: line)
+    }
+
+    private func makePresentation() -> LessonPresentation {
+        let state = PresentationVisualState(
+            code: "print(\"Legacy\")",
+            codeTokens: [PresentationCodeToken(id: "print", text: "print")],
+            values: [PresentationValue(id: "message", name: "message", value: "Legacy")],
+            output: nil,
+            outputTargetID: "console",
+            description: "A print call is ready to run."
+        )
+        return LessonPresentation(
+            id: "compat-presentation",
+            title: "Compatibility presentation",
+            posterDescription: "A supported presentation.",
+            posterState: state,
+            scenes: [
+                PresentationScene(
+                    id: "scene-1",
+                    title: "Run print",
+                    caption: "The value travels to output.",
+                    narration: "Run the print call.",
+                    staticDescription: "The print token points to the console.",
+                    visualKind: .codeExecution,
+                    focusTargets: [PresentationFocusTarget(kind: .codeToken, id: "print")],
+                    before: state,
+                    after: PresentationVisualState(
+                        code: state.code,
+                        codeTokens: state.codeTokens,
+                        values: state.values,
+                        output: "Legacy",
+                        outputTargetID: "console",
+                        description: "Legacy appears in the console."
+                    )
+                )
+            ],
+            transcript: "Run print and observe Legacy in the console.",
+            narrationLocale: "en-US",
+            finalRecallQuestionID: "recall-1",
+            aiCodeExercise: nil,
+            conceptIDs: ["swift.print"],
+            objectiveMappings: [
+                ObjectiveMapping(
+                    conceptID: "swift.print",
+                    objectiveSetID: ObjectiveSetID(rawValue: "swift-associate-2024"),
+                    objectiveID: ObjectiveID(rawValue: "3.1")
+                )
+            ],
+            provenance: LessonPresentationProvenance(source: .bundled, revision: 1)
         )
     }
 

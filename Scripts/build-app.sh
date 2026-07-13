@@ -17,6 +17,12 @@ set -euo pipefail
 
 # Move to the project root (this script lives in Scripts/).
 cd "$(dirname "$0")/.."
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+# shellcheck source=check-source-provenance.sh
+source "${REPO_ROOT}/Scripts/check-source-provenance.sh"
+
+assert_clean_source_provenance "$REPO_ROOT"
+SOURCE_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 
 APP_NAME="SwiftTutor Apprentice"     # what you see in Finder
 BINARY="SwiftTutorApprentice"        # the built executable's name
@@ -41,6 +47,35 @@ mkdir -p "${APP_DIR}/Contents/Resources"
 
 # Copy the executable into the bundle.
 cp "$BIN_PATH" "${APP_DIR}/Contents/MacOS/${BINARY}"
+
+# Prove the assembled executable is the exact release artifact before signing.
+# Signing mutates the Mach-O, so this equality check must happen here.
+UNSIGNED_RELEASE_SHA="$(shasum -a 256 "$BIN_PATH" | awk '{print $1}')"
+UNSIGNED_BUNDLE_SHA="$(shasum -a 256 "${APP_DIR}/Contents/MacOS/${BINARY}" | awk '{print $1}')"
+if [[ "$UNSIGNED_RELEASE_SHA" != "$UNSIGNED_BUNDLE_SHA" ]]; then
+    echo "!! Copied bundle executable does not match the unsigned release binary" >&2
+    exit 1
+fi
+
+# Re-check after compilation and copying so modified source cannot be sealed as
+# a clean commit. Also reject a clean HEAD change that happened during build.
+assert_clean_source_provenance "$REPO_ROOT"
+POST_BUILD_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+if [[ "$POST_BUILD_COMMIT" != "$SOURCE_COMMIT" ]]; then
+    echo "!! Source HEAD changed during build: $SOURCE_COMMIT -> $POST_BUILD_COMMIT" >&2
+    exit 1
+fi
+cat > "${APP_DIR}/Contents/Resources/BuildManifest.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>SourceCommit</key>             <string>${SOURCE_COMMIT}</string>
+    <key>SourceWorkingTreeState</key>   <string>clean</string>
+    <key>UnsignedExecutableSHA256</key> <string>${UNSIGNED_RELEASE_SHA}</string>
+</dict>
+</plist>
+PLIST
 
 # Copy the app icon in, if it exists.
 ICON_LINE=""
@@ -72,9 +107,24 @@ ${ICON_LINE}
 PLIST
 
 # Ad-hoc code signature so macOS is happy launching it locally.
-# (No Apple Developer account needed for personal use.)
-codesign --force --deep --sign - "$APP_DIR" >/dev/null 2>&1 || \
-    echo "   (codesign skipped — app will still run for local personal use)"
+# (No Apple Developer account needed for personal use.) A failed signature is
+# a failed build because the verifier relies on the sealed bundle resources.
+codesign --force --deep --sign - "$APP_DIR"
+
+# Signing is an external process and is the final mutation boundary. Verify the
+# signature it produced, then prove source provenance and HEAD stayed fixed
+# before printing any success claim.
+CODESIGN_VERIFY_OUTPUT="$(codesign --verify --deep --strict --verbose=2 "$APP_DIR" 2>&1)" \
+    || {
+        echo "!! codesign verification failed: $CODESIGN_VERIFY_OUTPUT" >&2
+        exit 1
+    }
+assert_clean_source_provenance "$REPO_ROOT"
+FINAL_SOURCE_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+if [[ "$FINAL_SOURCE_COMMIT" != "$SOURCE_COMMIT" ]]; then
+    echo "!! Source HEAD changed during bundle assembly: $SOURCE_COMMIT -> $FINAL_SOURCE_COMMIT" >&2
+    exit 1
+fi
 
 echo ""
 echo "==> Done."

@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-verify-bundle:
+    runs-on: macos-14
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Test source provenance guard
+        run: bash Tests/Scripts/source-provenance-tests.sh
+      - name: Run tests
+        run: swift test
+      - name: Build release executable
+        run: swift build -c release
+      - name: Build signed app bundle
+        run: ./Scripts/build-app.sh
+      - name: Verify signed app bundle
+        run: bash Scripts/verify-app-bundle.sh

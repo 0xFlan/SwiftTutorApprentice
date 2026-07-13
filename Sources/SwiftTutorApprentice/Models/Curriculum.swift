@@ -66,7 +66,8 @@ enum Curriculum {
         For this lesson, call the print function with a String, like this:
         print("Hello, Swift!")
         """,
-        deepContent: DeepLessonPilotContent.lesson1
+        deepContent: DeepLessonPilotContent.lesson1,
+        presentation: SwiftPilotPresentationContent.lesson1
     )
 
     // MARK: - Lesson 2: Storing Text in a Constant
@@ -103,7 +104,8 @@ enum Curriculum {
         let name = "Alex"
         print(name)
         """,
-        deepContent: DeepLessonPilotContent.lesson2
+        deepContent: DeepLessonPilotContent.lesson2,
+        presentation: SwiftPilotPresentationContent.lesson2
     )
 
     // MARK: - Lesson 3: Variables You Can Change
@@ -143,7 +145,8 @@ enum Curriculum {
         count = 2
         print(count)
         """,
-        deepContent: DeepLessonPilotContent.lesson3
+        deepContent: DeepLessonPilotContent.lesson3,
+        presentation: SwiftPilotPresentationContent.lesson3
     )
 
     // MARK: - Lesson 4: Combining Text with String Interpolation

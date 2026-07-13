@@ -17,6 +17,8 @@ import Foundation
 
 final class AppSettings: ObservableObject {
 
+    private let userDefaults: UserDefaults
+
     private enum Keys {
         static let aiEnabled = "aiEnabled"
         static let aiCommand = "aiCommand"
@@ -28,44 +30,44 @@ final class AppSettings: ObservableObject {
 
     /// How the optional AI coach reaches an AI: "cli" (default) or "api".
     @Published var aiProvider: String {
-        didSet { UserDefaults.standard.set(aiProvider, forKey: Keys.aiProvider) }
+        didSet { userDefaults.set(aiProvider, forKey: Keys.aiProvider) }
     }
 
     /// Anthropic API key, used when aiProvider == "api".
     /// Stored in UserDefaults for simplicity on this personal app. For a
     /// shipped app you'd keep this in the Keychain instead.
     @Published var apiKey: String {
-        didSet { UserDefaults.standard.set(apiKey, forKey: Keys.apiKey) }
+        didSet { userDefaults.set(apiKey, forKey: Keys.apiKey) }
     }
 
     /// Model id for the API provider.
     @Published var apiModel: String {
-        didSet { UserDefaults.standard.set(apiModel, forKey: Keys.apiModel) }
+        didSet { userDefaults.set(apiModel, forKey: Keys.apiModel) }
     }
 
     /// Whether the optional AI coach is available. Off by default.
     @Published var aiEnabled: Bool {
-        didSet { UserDefaults.standard.set(aiEnabled, forKey: Keys.aiEnabled) }
+        didSet { userDefaults.set(aiEnabled, forKey: Keys.aiEnabled) }
     }
 
     /// The command-line tool to invoke for AI help (e.g. "claude").
     /// You can also enter an absolute path.
     @Published var aiCommand: String {
-        didSet { UserDefaults.standard.set(aiCommand, forKey: Keys.aiCommand) }
+        didSet { userDefaults.set(aiCommand, forKey: Keys.aiCommand) }
     }
 
     /// Whether the learner has seen the first-run welcome.
     @Published var hasSeenWelcome: Bool {
-        didSet { UserDefaults.standard.set(hasSeenWelcome, forKey: Keys.hasSeenWelcome) }
+        didSet { userDefaults.set(hasSeenWelcome, forKey: Keys.hasSeenWelcome) }
     }
 
-    init() {
-        let defaults = UserDefaults.standard
-        aiEnabled = defaults.bool(forKey: Keys.aiEnabled) // false if unset
-        aiCommand = defaults.string(forKey: Keys.aiCommand) ?? "claude"
-        hasSeenWelcome = defaults.bool(forKey: Keys.hasSeenWelcome) // false if unset
-        aiProvider = defaults.string(forKey: Keys.aiProvider) ?? "cli"
-        apiKey = defaults.string(forKey: Keys.apiKey) ?? ""
-        apiModel = defaults.string(forKey: Keys.apiModel) ?? "claude-opus-4-8"
+    init(userDefaults: UserDefaults = .standard) {
+        self.userDefaults = userDefaults
+        aiEnabled = userDefaults.bool(forKey: Keys.aiEnabled) // false if unset
+        aiCommand = userDefaults.string(forKey: Keys.aiCommand) ?? "claude"
+        hasSeenWelcome = userDefaults.bool(forKey: Keys.hasSeenWelcome) // false if unset
+        aiProvider = userDefaults.string(forKey: Keys.aiProvider) ?? "cli"
+        apiKey = userDefaults.string(forKey: Keys.apiKey) ?? ""
+        apiModel = userDefaults.string(forKey: Keys.apiModel) ?? "claude-opus-4-8"
     }
 }

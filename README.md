@@ -25,6 +25,12 @@ cd ~/Developer/SwiftTutorApprentice
 Then open `dist/SwiftTutor Apprentice.app` from Finder (drag it to your
 Applications folder to keep it). Re-run the script after any code change.
 
+To verify that the signed bundle was built from the current checkout:
+
+```bash
+bash Scripts/verify-app-bundle.sh
+```
+
 First launch may show a Gatekeeper prompt because the app isn't from the App
 Store — right-click the app → **Open** → **Open**, or approve it in
 **System Settings → Privacy & Security**.
@@ -48,32 +54,42 @@ Lessons 23–24 are **read-only concept lessons** (SwiftUI builds a UI, which
 the console runner can't display) — you read and "mark as read" instead of
 running.
 
-### Deep Lesson pilot (Lessons 1–3)
+### Course platform milestone one
 
-The first three built-in lessons add an optional, concept-first path before the
-usual workspace. The first time you visit one, its **Deep Lesson** sheet opens
-after onboarding closes. You can skip it immediately. The non-locking **Deep
-Lesson** and **Modify** stage buttons let you open or replay either sheet at any
-time; **Practice & Run** is the existing workspace and remains available
-throughout.
+After the one-time Welcome, every launch opens **Course Home**. It shows the
+approved four-course roadmap:
 
-Each Deep Lesson pairs short segments with working examples and common wrong
-variants, then uses a **Syntax Microscope** to label each piece **Required by
-Swift**, **Convention**, or **Depends on context**. Recall questions check the
-ideas before a guided **Modify** task asks you to change working code and
-predict its new output.
+- **Swift Development** — available now as the Milestone 1 pilot.
+- **Web Development**, **Cybersecurity**, and **Networking** — visible as
+  **Coming next**, with no progress or readiness claims before their content
+  ships.
 
-After Modify accepts both the code and prediction, you can place them in the
-existing editor for a real Run; the app asks before overwriting different
-editor content. This does not replace or lock the normal workspace, and passing
-Modify does not complete a lesson. Completion still requires a successful Run
-whose output matches the lesson's expected output.
+Swift keeps the existing 24-lesson curriculum. In built-in Lessons 1–3, an
+embedded offline animated presentation is the first teaching surface, like a
+lesson video above the written material. It opens paused, never autoplays, and
+uses authored SwiftUI state changes rather than streaming media. Learners
+control Play/Pause, Back, Next, Replay, captions, the full transcript, and
+optional local narration entirely inside the 16:9 player. The player scrolls
+away with the lesson instead of becoming sticky, and playback never moves or
+locks the coding workspace. It also supports Reduce Motion, VoiceOver
+descriptions, and keyboard operation.
 
-The pilot remains fully offline and local by default. Its stage progress is
-versioned and preserved alongside existing completion, while legacy lessons,
-progress files, and custom lessons remain compatible. This pilot applies only
-to built-in Lessons 1–3; it does not add web tracks or rewrite the app as a new
-platform.
+The pilot loop is **Watch → Recall → Modify → Practice/Run**. Watching or
+skipping records player state only; it does not prove mastery or complete the
+lesson. Recall and the guided Modify task remain non-locking, and completion
+still requires a successful Run whose output matches the lesson's expected
+output. The written concept lesson remains available through **Read deeper**
+and never auto-opens.
+
+Each pilot lesson also includes a local **Understand AI Code** exercise: inspect
+generated-looking Swift, judge specific claims, submit the answers, and review
+authored feedback. This exercise runs without a network request and does not
+invoke the optional remote AI coach.
+
+Progress is private and course-scoped on this Mac. Existing completion,
+Deep Lesson/Recall/Modify activity, custom lessons, settings, and workspace code
+migrate forward without being treated as presentation activity or certification
+readiness.
 
 **The learning loop, every code lesson:**
 
@@ -89,12 +105,11 @@ platform.
 6. A clean run that matches the lesson's expected output marks it complete
    (green check). Move between lessons with **⌘[** / **⌘]**.
 
-**Watch a narrated walkthrough.** Click **Walkthrough** to have the app type
-the code in for you and narrate each step aloud (built-in macOS speech, fully
-offline): it introduces the lesson, types the code character by character,
-highlights and explains each Syntax Lens token, then runs it and explains the
-output. A caption shows the narration text, and the editor is read-only while
-it plays. Stop any time.
+**Watch the animated lesson.** In authored lessons, use the player at the top
+for the offline visual explanation and optional built-in macOS narration.
+Captions remain visible, the transcript stays inside the player, and the
+controls never type into, move, or lock the editor. Scroll down whenever you
+are ready for Recall, Modify, and Practice/Run.
 
 **Practice by arranging code (Parsons problems).** On multi-line lessons,
 **Arrange first** opens a practice step: the lesson's code, split into lines and
@@ -155,15 +170,22 @@ doesn't need it.
 
 ## Roadmap
 
-The approved next milestone adds a stable Course Home, course-scoped progress,
-an embedded offline animated lesson player for Swift Lessons 1–3, and fixes for
-sidebar/detail clipping and accidental bottom-scroll restoration. The platform
-is designed to expand into complete certification-oriented Swift Development,
-Web Development, Cybersecurity, and Networking courses, including exercises
-that teach AI-first beginners to understand and verify generated code.
+Milestone 1 ships the Course Home and animated Swift Lessons 1–3 pilot described
+above. Certification is an approved future end-state goal, not a current
+guarantee or readiness claim.
+
+Later milestones remain the full approved program: complete Swift Development,
+Web Development, Cybersecurity, and Networking curricula; presentations and
+active practice throughout; cumulative review; projects; mock exams;
+reduced-scaffold capstones; complete **Understand AI Code** threads; and
+objective-level certification-readiness reports based on repeated independent
+evidence. The app will never guarantee an external exam result, job, or
+professional outcome.
 
 See the [reviewed platform design](docs/superpowers/specs/2026-07-10-course-platform-animated-certification-tracks-design.md)
 and [learning research](outputs/2026-07-10-learning-optimization-research.md).
+Milestone 1's backed-up real-app verification is recorded in the
+[smoke evidence](docs/testing/course-platform-milestone-1-smoke.md).
 
 ## Contributing
 

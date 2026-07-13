@@ -20,41 +20,44 @@ struct RunOutputView: View {
     var body: some View {
         GeometryReader { geo in
             let narrow = geo.size.width < 560
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
 
                 // --- Prediction + Run controls ---
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("What do you think this will output?")
-                            .font(.subheadline.bold())
-                        TextField("Your prediction…", text: $prediction)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(.body, design: .monospaced))
-                            .disableAutocorrection(true)
-                    }
+                HStack(spacing: 8) {
+                    Text("Predict output")
+                        .font(.caption.bold())
+                        .fixedSize()
 
-                    VStack(spacing: 6) {
-                        Button(action: onRun) {
-                            HStack(spacing: 6) {
-                                if isRunning {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                } else {
-                                    Image(systemName: "play.fill")
-                                }
-                                Text(isRunning ? "Running…" : "Run")
-                            }
-                            .frame(minWidth: 90)
+                    TextField("Your prediction…", text: $prediction)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.body, design: .monospaced))
+                        .disableAutocorrection(true)
+                        .background {
+                            RuntimeViewMarker(identifier: "run-prediction-field")
                         }
-                        .keyboardShortcut("r", modifiers: .command)
-                        .buttonStyle(.borderedProminent)
-                        .disabled(isRunning)
 
-                        Text("⌘R")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                    Button(action: onRun) {
+                        HStack(spacing: 5) {
+                            if isRunning {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "play.fill")
+                            }
+                            Text(isRunning ? "Running…" : "Run")
+                        }
+                        .frame(minWidth: 72)
+                    }
+                    .keyboardShortcut("r", modifiers: .command)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(isRunning)
+                    .help("Run the code (Command-R)")
+                    .background {
+                        RuntimeViewMarker(identifier: "run-button")
                     }
                 }
+                .frame(height: 24)
 
                 Divider()
 
@@ -63,12 +66,22 @@ struct RunOutputView: View {
                     resultsView(result, narrow: narrow)
                 } else {
                     Text("Run your code to see stdout, stderr, and the exit code here.")
-                        .font(.callout)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .background {
+                            RuntimeViewMarker(identifier: "run-placeholder")
+                        }
                 }
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(
+                width: geo.size.width,
+                height: geo.size.height,
+                alignment: .topLeading
+            )
         }
     }
 
@@ -124,6 +137,10 @@ struct RunOutputView: View {
                     tint: .accentColor,
                     text: explanation(for: result)
                 )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                ScrollViewportProbe(identifier: "run-result-scroll")
             }
         }
     }

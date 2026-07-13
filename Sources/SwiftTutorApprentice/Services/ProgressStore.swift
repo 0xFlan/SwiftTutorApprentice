@@ -33,7 +33,7 @@ struct LessonStageEvent: Codable, Hashable {
 
 final class ProgressStore: ObservableObject {
 
-    private static let currentVersion = 2
+    private var document: ProgressDocument?
 
     /// The set of lesson ids the learner has completed.
     @Published private(set) var completedLessonIDs: Set<Int> = []
@@ -44,78 +44,27 @@ final class ProgressStore: ObservableObject {
     /// True when a newer on-disk schema can only be opened without mutations.
     @Published private(set) var isReadOnlyForUnsupportedVersion = false
 
-    /// On-disk shape of the saved data.
-    private struct SavedProgress: Codable {
-        var version: Int
-        var completedLessonIDs: [Int]
-        var stageEvents: [LessonStageEvent]
+    /// Non-nil when a supported on-disk schema could not be decoded safely.
+    @Published private(set) var loadError: String?
 
-        private enum CodingKeys: String, CodingKey {
-            case version
-            case completedLessonIDs
-            case stageEvents
-        }
+    /// Non-nil when the in-memory document could not be written to disk.
+    @Published private(set) var saveError: String?
 
-        init(
-            version: Int,
-            completedLessonIDs: [Int],
-            stageEvents: [LessonStageEvent]
-        ) {
-            self.version = version
-            self.completedLessonIDs = completedLessonIDs
-            self.stageEvents = stageEvents
-        }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
-            completedLessonIDs = try container.decode([Int].self, forKey: .completedLessonIDs)
-            stageEvents = (try? container.decode(
-                LossyStageEvents.self,
-                forKey: .stageEvents
-            ))?.events ?? []
-        }
-    }
-
-    private struct VersionEnvelope: Decodable {
-        let version: Int
-
-        private enum CodingKeys: String, CodingKey {
-            case version
-        }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
-        }
-    }
-
-    private struct LossyStageEvents: Decodable {
-        let events: [LessonStageEvent]
-
-        init(from decoder: Decoder) throws {
-            var container = try decoder.unkeyedContainer()
-            var decodedEvents: [LessonStageEvent] = []
-
-            while !container.isAtEnd {
-                let eventDecoder = try container.superDecoder()
-                if let event = try? LessonStageEvent(from: eventDecoder) {
-                    decodedEvents.append(event)
-                }
-            }
-
-            events = decodedEvents
-        }
-    }
-
-    private struct StageEventKey: Hashable {
-        let lessonID: Int
-        let kind: LessonStageEventKind
-        let questionID: String?
-    }
+    private var protectedOriginalData: Data?
 
     private let fileURL: URL
     private let now: () -> Date
+    private let makeEventID: () -> ProgressEventID
+    private let writeData: (Data, URL) throws -> Void
+
+    /// The exact local file this store reads and writes. Recovery UI may reveal
+    /// this location, but callers cannot replace it or bypass the store's
+    /// migration and fail-closed write gates.
+    var persistenceURL: URL { fileURL }
+
+    private var canMutate: Bool {
+        !isReadOnlyForUnsupportedVersion && loadError == nil && document != nil
+    }
 
     convenience init() {
         // Build the path to our Application Support folder + file.
@@ -127,29 +76,106 @@ final class ProgressStore: ObservableObject {
         self.init(fileURL: fileURL, now: Date.init)
     }
 
-    init(fileURL: URL, now: @escaping () -> Date) {
+    init(
+        fileURL: URL,
+        now: @escaping () -> Date,
+        makeEventID: @escaping () -> ProgressEventID = {
+            ProgressEventID(rawValue: UUID().uuidString)
+        },
+        writeData: @escaping (Data, URL) throws -> Void = ProgressStore.atomicWrite
+    ) {
         self.fileURL = fileURL
         self.now = now
+        self.makeEventID = makeEventID
+        self.writeData = writeData
 
         load()
     }
 
     // MARK: - Queries
 
+    func progress(for courseID: CourseID) -> CourseProgressDocument {
+        document?.courses[courseID] ?? CourseProgressDocument()
+    }
+
+    func isComplete(_ key: LessonKey) -> Bool {
+        progress(for: key.courseID).completedLessonLocalIDs.contains(key.localID)
+    }
+
     func isComplete(_ lessonID: Int) -> Bool {
-        completedLessonIDs.contains(lessonID)
+        isComplete(.swift(lessonID))
+    }
+
+    func hasViewedDeepLesson(_ key: LessonKey) -> Bool {
+        progress(for: key.courseID).stageEvents.contains {
+            $0.lessonLocalID == key.localID && $0.kind == .deepLessonViewed
+        }
     }
 
     func hasViewedDeepLesson(_ lessonID: Int) -> Bool {
-        stageEvents.contains {
-            $0.lessonID == lessonID && $0.kind == .deepLessonViewed
+        hasViewedDeepLesson(.swift(lessonID))
+    }
+
+    func hasPassedModify(_ key: LessonKey) -> Bool {
+        progress(for: key.courseID).stageEvents.contains {
+            $0.lessonLocalID == key.localID && $0.kind == .modifyPassed
         }
     }
 
     func hasPassedModify(_ lessonID: Int) -> Bool {
-        stageEvents.contains {
-            $0.lessonID == lessonID && $0.kind == .modifyPassed
+        hasPassedModify(.swift(lessonID))
+    }
+
+    func presentationState(for key: LessonKey) -> LessonPresentationState? {
+        progress(for: key.courseID).presentationStates[key.localID]
+    }
+
+    func recallAnswer(for key: LessonKey, questionID: String) -> Bool? {
+        progress(for: key.courseID).stageEvents.first {
+            $0.lessonLocalID == key.localID
+                && $0.kind == .recallAnswered
+                && $0.questionID == questionID
+        }?.wasCorrect
+    }
+
+    func hasMeaningfulActivity(in courseID: CourseID) -> Bool {
+        let courseProgress = progress(for: courseID)
+        if courseProgress.lastLessonLocalID != nil
+            || !courseProgress.completedLessonLocalIDs.isEmpty
+            || !courseProgress.stageEvents.isEmpty
+            || !courseProgress.assessmentAttempts.isEmpty
+        {
+            return true
         }
+        if courseProgress.presentationStates.values.contains(where: {
+            $0.status != .notStarted
+        }) {
+            return true
+        }
+        return courseProgress.reviews.contains { review in
+            guard let satisfyingAttemptID = review.satisfyingAttemptID else {
+                return false
+            }
+            return courseProgress.assessmentAttempts.contains {
+                $0.id == satisfyingAttemptID && $0.lessonKey.courseID == courseID
+            }
+        }
+    }
+
+    func lastLessonKey(in courseID: CourseID) -> LessonKey? {
+        let courseProgress = progress(for: courseID)
+        if let localID = courseProgress.lastLessonLocalID {
+            return LessonKey(courseID: courseID, localID: localID)
+        }
+        for review in courseProgress.reviews.reversed() {
+            guard let satisfyingAttemptID = review.satisfyingAttemptID,
+                  let attempt = courseProgress.assessmentAttempts.last(where: {
+                      $0.id == satisfyingAttemptID && $0.lessonKey.courseID == courseID
+                  })
+            else { continue }
+            return attempt.lessonKey
+        }
+        return nil
     }
 
     var completedCount: Int { completedLessonIDs.count }
@@ -157,76 +183,170 @@ final class ProgressStore: ObservableObject {
     // MARK: - Changes
 
     /// Mark a lesson complete (no-op if already complete) and save.
-    func markComplete(_ lessonID: Int) {
-        guard !isReadOnlyForUnsupportedVersion,
-              !completedLessonIDs.contains(lessonID)
-        else { return }
-        completedLessonIDs.insert(lessonID)
+    func markComplete(_ key: LessonKey) {
+        guard canMutate else { return }
+        var courseProgress = progress(for: key.courseID)
+        guard courseProgress.completedLessonLocalIDs.insert(key.localID).inserted else {
+            return
+        }
+        courseProgress.lastLessonLocalID = key.localID
+        document?.courses[key.courseID] = courseProgress
+        syncCompatibilitySurfaces()
         save()
     }
 
-    func markDeepLessonViewed(_ lessonID: Int) {
-        guard !isReadOnlyForUnsupportedVersion,
-              !hasViewedDeepLesson(lessonID)
+    func markComplete(_ lessonID: Int) {
+        markComplete(.swift(lessonID))
+    }
+
+    func markDeepLessonViewed(_ key: LessonKey) {
+        guard canMutate,
+              !hasViewedDeepLesson(key)
         else { return }
-        stageEvents.append(
-            LessonStageEvent(
-                lessonID: lessonID,
+        var courseProgress = progress(for: key.courseID)
+        courseProgress.stageEvents.append(
+            CourseStageEvent(
+                id: makeEventID(),
+                lessonLocalID: key.localID,
                 kind: .deepLessonViewed,
                 timestamp: now(),
                 questionID: nil,
                 wasCorrect: nil
             )
         )
+        courseProgress.lastLessonLocalID = key.localID
+        document?.courses[key.courseID] = courseProgress
+        syncCompatibilitySurfaces()
         save()
     }
 
-    func markModifyPassed(_ lessonID: Int) {
-        guard !isReadOnlyForUnsupportedVersion,
-              !hasPassedModify(lessonID)
+    func markDeepLessonViewed(_ lessonID: Int) {
+        markDeepLessonViewed(.swift(lessonID))
+    }
+
+    func markModifyPassed(_ key: LessonKey) {
+        guard canMutate,
+              !hasPassedModify(key)
         else { return }
-        stageEvents.append(
-            LessonStageEvent(
-                lessonID: lessonID,
+        var courseProgress = progress(for: key.courseID)
+        courseProgress.stageEvents.append(
+            CourseStageEvent(
+                id: makeEventID(),
+                lessonLocalID: key.localID,
                 kind: .modifyPassed,
                 timestamp: now(),
                 questionID: nil,
                 wasCorrect: nil
             )
         )
+        courseProgress.lastLessonLocalID = key.localID
+        document?.courses[key.courseID] = courseProgress
+        syncCompatibilitySurfaces()
         save()
     }
 
-    func recordRecallAnswer(lessonID: Int, questionID: String, wasCorrect: Bool) {
-        guard !isReadOnlyForUnsupportedVersion else { return }
+    func markModifyPassed(_ lessonID: Int) {
+        markModifyPassed(.swift(lessonID))
+    }
+
+    func recordRecallAnswer(
+        lessonKey: LessonKey,
+        questionID: String,
+        wasCorrect: Bool
+    ) {
+        guard canMutate else { return }
         guard !questionID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }
-        guard !stageEvents.contains(where: {
-            $0.lessonID == lessonID
+        var courseProgress = progress(for: lessonKey.courseID)
+        guard !courseProgress.stageEvents.contains(where: {
+            $0.lessonLocalID == lessonKey.localID
                 && $0.kind == .recallAnswered
                 && $0.questionID == questionID
         }) else {
             return
         }
 
-        stageEvents.append(
-            LessonStageEvent(
-                lessonID: lessonID,
+        courseProgress.stageEvents.append(
+            CourseStageEvent(
+                id: makeEventID(),
+                lessonLocalID: lessonKey.localID,
                 kind: .recallAnswered,
                 timestamp: now(),
                 questionID: questionID,
                 wasCorrect: wasCorrect
             )
         )
+        courseProgress.lastLessonLocalID = lessonKey.localID
+        document?.courses[lessonKey.courseID] = courseProgress
+        syncCompatibilitySurfaces()
+        save()
+    }
+
+    func recordRecallAnswer(lessonID: Int, questionID: String, wasCorrect: Bool) {
+        recordRecallAnswer(
+            lessonKey: .swift(lessonID),
+            questionID: questionID,
+            wasCorrect: wasCorrect
+        )
+    }
+
+    func setPresentationState(
+        _ state: LessonPresentationState,
+        for key: LessonKey
+    ) {
+        guard canMutate else { return }
+        var courseProgress = progress(for: key.courseID)
+        courseProgress.presentationStates[key.localID] = state
+        if state.status != .notStarted {
+            courseProgress.lastLessonLocalID = key.localID
+        }
+        document?.courses[key.courseID] = courseProgress
+        syncCompatibilitySurfaces()
+        save()
+    }
+
+    func record(_ attempt: AssessmentAttempt) {
+        guard canMutate,
+              document?.courses.values.contains(where: { courseProgress in
+                  courseProgress.assessmentAttempts.contains {
+                      $0.id == attempt.id
+                  }
+              }) == false
+        else { return }
+        var courseProgress = progress(for: attempt.lessonKey.courseID)
+        courseProgress.assessmentAttempts.append(attempt)
+        courseProgress.lastLessonLocalID = attempt.lessonKey.localID
+        document?.courses[attempt.lessonKey.courseID] = courseProgress
+        syncCompatibilitySurfaces()
+        save()
+    }
+
+    func recordSavedWorkspaceActivity(for key: LessonKey) {
+        guard canMutate else { return }
+        var courseProgress = progress(for: key.courseID)
+        courseProgress.lastLessonLocalID = key.localID
+        document?.courses[key.courseID] = courseProgress
+        syncCompatibilitySurfaces()
         save()
     }
 
     /// Forget all progress and save.
+    func reset(courseID: CourseID) {
+        guard canMutate else { return }
+        document?.courses[courseID] = CourseProgressDocument()
+        syncCompatibilitySurfaces()
+        save()
+    }
+
     func reset() {
-        guard !isReadOnlyForUnsupportedVersion else { return }
-        completedLessonIDs.removeAll()
-        stageEvents.removeAll()
+        reset(courseID: .swiftDevelopment)
+    }
+
+    func retrySave() {
+        guard canMutate,
+              saveError != nil
+        else { return }
         save()
     }
 
@@ -234,72 +354,70 @@ final class ProgressStore: ObservableObject {
 
     private func load() {
         guard let data = try? Data(contentsOf: fileURL) else {
-            return // No file yet (first launch) — start empty.
-        }
-
-        let decoder = JSONDecoder()
-        if let envelope = try? decoder.decode(VersionEnvelope.self, from: data) {
-            isReadOnlyForUnsupportedVersion = !(1...Self.currentVersion)
-                .contains(envelope.version)
-        }
-
-        guard let saved = try? decoder.decode(SavedProgress.self, from: data) else {
+            document = ProgressDocument(
+                version: ProgressDocument.currentVersion,
+                courses: [.swiftDevelopment: CourseProgressDocument()]
+            )
+            syncCompatibilitySurfaces()
             return
         }
-        completedLessonIDs = Set(saved.completedLessonIDs)
-        stageEvents = Self.validUniqueEvents(from: saved.stageEvents)
+
+        switch ProgressMigration.decode(data: data) {
+        case let .current(loadedDocument), let .migrated(_, loadedDocument):
+            document = loadedDocument
+        case let .unsupportedFuture(_, originalData):
+            isReadOnlyForUnsupportedVersion = true
+            protectedOriginalData = originalData
+            document = nil
+        case let .corruptSupported(_, originalData, reason):
+            loadError = reason
+            protectedOriginalData = originalData
+            document = nil
+        }
+        syncCompatibilitySurfaces()
+    }
+
+    private func syncCompatibilitySurfaces() {
+        let swiftProgress = document?.courses[.swiftDevelopment]
+        completedLessonIDs = Set(
+            (swiftProgress?.completedLessonLocalIDs ?? []).compactMap {
+                Int($0.rawValue)
+            }
+        )
+        stageEvents = (swiftProgress?.stageEvents ?? []).compactMap { event in
+            guard let lessonID = Int(event.lessonLocalID.rawValue),
+                  let kind = LessonStageEventKind(rawValue: event.kind.rawValue)
+            else { return nil }
+            return LessonStageEvent(
+                lessonID: lessonID,
+                kind: kind,
+                timestamp: event.timestamp,
+                questionID: event.questionID,
+                wasCorrect: event.wasCorrect
+            )
+        }
     }
 
     private func save() {
-        guard !isReadOnlyForUnsupportedVersion else { return }
-        let saved = SavedProgress(
-            version: Self.currentVersion,
-            completedLessonIDs: completedLessonIDs.sorted(),
-            stageEvents: stageEvents
-        )
+        guard canMutate, let document else { return }
         do {
-            try FileManager.default.createDirectory(
-                at: fileURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
             let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted]
-            let data = try encoder.encode(saved)
-            try data.write(to: fileURL, options: .atomic)
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = ProgressDateCoding.encodingStrategy
+            let data = try encoder.encode(document)
+            try writeData(data, fileURL)
+            saveError = nil
         } catch {
-            // For a personal MVP, failing to save progress is not fatal;
-            // we just print so it's visible while developing.
-            print("ProgressStore: could not save progress — \(error.localizedDescription)")
+            saveError = error.localizedDescription
         }
     }
 
-    private static func hasValidMetadata(_ event: LessonStageEvent) -> Bool {
-        switch event.kind {
-        case .recallAnswered:
-            guard let questionID = event.questionID else { return false }
-            return !questionID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && event.wasCorrect != nil
-        case .deepLessonViewed, .modifyPassed:
-            return event.questionID == nil && event.wasCorrect == nil
-        }
+    static func atomicWrite(_ data: Data, _ url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try data.write(to: url, options: .atomic)
     }
 
-    private static func validUniqueEvents(
-        from events: [LessonStageEvent]
-    ) -> [LessonStageEvent] {
-        var seenKeys: Set<StageEventKey> = []
-        var uniqueEvents: [LessonStageEvent] = []
-
-        for event in events where hasValidMetadata(event) {
-            let key = StageEventKey(
-                lessonID: event.lessonID,
-                kind: event.kind,
-                questionID: event.kind == .recallAnswered ? event.questionID : nil
-            )
-            guard seenKeys.insert(key).inserted else { continue }
-            uniqueEvents.append(event)
-        }
-
-        return uniqueEvents
-    }
 }
