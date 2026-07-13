@@ -12,7 +12,7 @@
 // ------------------------------------------------------------
 
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 
 struct NarrationVoiceSelection {
     let voice: AVSpeechSynthesisVoice?
@@ -27,7 +27,7 @@ protocol PresentationNarrating: AnyObject {
 
 @MainActor
 final class NarrationSpeaker: NSObject, PresentationNarrating,
-    @preconcurrency AVSpeechSynthesizerDelegate {
+    AVSpeechSynthesizerDelegate {
 
     private struct ActiveSpeech {
         let utterance: AVSpeechUtterance
