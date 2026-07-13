@@ -88,7 +88,6 @@ struct LessonListSidebar: View {
                     switch request.alignment {
                     case .center:
                         proxy.scrollTo(request.lessonKey, anchor: .center)
-                        scrollCoordinator.fulfillSidebarVisibilityRequest(request)
                     case .nearest:
                         proxy.scrollTo(request.lessonKey)
                         // macOS 14 can ignore an unanchored List scroll when
@@ -306,7 +305,9 @@ private final class SidebarLessonRowProbeView: NSView {
 
         let rowFrame = convert(bounds, to: documentView)
         let visibleHeight = rowFrame.intersection(scrollView.documentVisibleRect).height
-        guard visibleHeight >= min(8, rowFrame.height) else { return }
+        guard rowFrame.height > 0,
+              visibleHeight >= min(8, rowFrame.height)
+        else { return }
         onMeaningfullyVisible(request)
     }
 
