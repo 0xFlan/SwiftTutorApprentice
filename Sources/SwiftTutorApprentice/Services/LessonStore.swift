@@ -21,12 +21,21 @@ final class LessonStore: ObservableObject {
     /// The current lessons, in display order.
     @Published private(set) var lessons: [Lesson] = []
 
-    /// Protects lesson files containing newer nested Deep Lesson data from any
-    /// lossy automatic rewrite or editor mutation.
-    @Published private(set) var isReadOnlyForUnsupportedDeepContent = false
+    /// Protects lesson files containing unsupported nested teaching data from
+    /// any lossy automatic rewrite or editor mutation.
+    @Published private(set) var isReadOnlyForUnsupportedLessonContent = false
+
+    /// Compatibility adapter for callers that predate presentation content.
+    var isReadOnlyForUnsupportedDeepContent: Bool {
+        isReadOnlyForUnsupportedLessonContent
+    }
 
     private let fileURL: URL
     private let defaults: [Lesson]
+
+    /// The exact local lesson file used by this store. Exposing its location is
+    /// read-only and does not change reconciliation or preservation behavior.
+    var persistenceURL: URL { fileURL }
     // Advance with supported bundled revisions; structural fields require a schemaVersion bump.
     private static let baselineSupportedBundledRevision = 1
 
@@ -63,17 +72,17 @@ final class LessonStore: ObservableObject {
 
     /// Add a brand-new lesson to the end.
     func add(_ lesson: Lesson) {
-        guard !isReadOnlyForUnsupportedDeepContent else { return }
-        lessons.append(reconcilingBundledDeepContent(in: lesson))
+        guard !isReadOnlyForUnsupportedLessonContent else { return }
+        lessons.append(reconcilingBundledContent(in: lesson))
         save()
     }
 
     /// Replace an existing lesson (matched by id) with an edited version.
     @discardableResult
     func update(_ lesson: Lesson) -> Lesson? {
-        guard !isReadOnlyForUnsupportedDeepContent else { return nil }
+        guard !isReadOnlyForUnsupportedLessonContent else { return nil }
         guard let index = lessons.firstIndex(where: { $0.id == lesson.id }) else { return nil }
-        let reconciledLesson = reconcilingBundledDeepContent(in: lesson)
+        let reconciledLesson = reconcilingBundledContent(in: lesson)
         lessons[index] = reconciledLesson
         save()
         return reconciledLesson
@@ -81,7 +90,7 @@ final class LessonStore: ObservableObject {
 
     /// Delete a lesson by id. Won't delete the last remaining lesson.
     func delete(id: Int) {
-        guard !isReadOnlyForUnsupportedDeepContent else { return }
+        guard !isReadOnlyForUnsupportedLessonContent else { return }
         guard lessons.count > 1 else { return }
         lessons.removeAll { $0.id == id }
         save()
@@ -89,7 +98,7 @@ final class LessonStore: ObservableObject {
 
     /// Move a lesson up or down in the list (for reordering).
     func move(id: Int, by offset: Int) {
-        guard !isReadOnlyForUnsupportedDeepContent else { return }
+        guard !isReadOnlyForUnsupportedLessonContent else { return }
         guard let index = lessons.firstIndex(where: { $0.id == id }) else { return }
         let target = index + offset
         guard target >= 0, target < lessons.count else { return }
@@ -99,7 +108,7 @@ final class LessonStore: ObservableObject {
 
     /// Throw away all changes and reload the built-in default curriculum.
     func restoreDefaults() {
-        guard !isReadOnlyForUnsupportedDeepContent else { return }
+        guard !isReadOnlyForUnsupportedLessonContent else { return }
         lessons = defaults
         save()
     }
@@ -119,10 +128,12 @@ final class LessonStore: ObservableObject {
         lessons = decoded
 
         if decoded.contains(where: \.hasUnsupportedDeepContent)
+            || decoded.contains(where: \.hasUnsupportedPresentation)
             || decoded.contains(where: hasNewerBundledDeepContent)
+            || decoded.contains(where: hasNewerBundledPresentation)
         {
-            isReadOnlyForUnsupportedDeepContent = true
-            print("LessonStore: unsupported Deep Lesson data; lesson editing is read-only")
+            isReadOnlyForUnsupportedLessonContent = true
+            print("LessonStore: unsupported lesson content; lesson editing is read-only")
             return
         }
 
@@ -138,11 +149,12 @@ final class LessonStore: ObservableObject {
     /// next launch. That's an acceptable choice for a curriculum app — use the
     /// editor to remove it again if needed.
     private func mergeDefaults() {
+        guard !isReadOnlyForUnsupportedLessonContent else { return }
         var changed = false
 
         for index in lessons.indices {
             let savedLessonBeforeReconciliation = lessons[index]
-            let reconciledLesson = reconcilingBundledDeepContent(
+            let reconciledLesson = reconcilingBundledContent(
                 in: savedLessonBeforeReconciliation
             )
             if reconciledLesson != savedLessonBeforeReconciliation {
@@ -151,6 +163,17 @@ final class LessonStore: ObservableObject {
             }
 
             let savedLesson = lessons[index]
+            if let defaultLesson = defaults.first(where: { $0.id == savedLesson.id }),
+               defaultLesson.kind == savedLesson.kind,
+               defaultLesson.starterCode == savedLesson.starterCode,
+               savedLessonBeforeReconciliation.presentation == nil,
+               savedLesson.presentation == nil,
+               let presentation = defaultLesson.presentation
+            {
+                lessons[index].presentation = presentation
+                changed = true
+            }
+
             guard let defaultLesson = defaults.first(where: { $0.id == savedLesson.id }),
                   defaultLesson.kind == savedLesson.kind,
                   defaultLesson.starterCode == savedLesson.starterCode,
@@ -184,6 +207,16 @@ final class LessonStore: ObservableObject {
         return provenance.revision > supportedBundledRevision(for: lesson.id)
     }
 
+    private func hasNewerBundledPresentation(_ lesson: Lesson) -> Bool {
+        guard let provenance = lesson.presentation?.provenance,
+              provenance.source == .bundled
+        else {
+            return false
+        }
+
+        return provenance.revision > supportedBundledPresentationRevision(for: lesson.id)
+    }
+
     private func supportedBundledRevision(for lessonID: Int) -> Int {
         guard let defaultProvenance = defaults
             .first(where: { $0.id == lessonID })?
@@ -195,6 +228,25 @@ final class LessonStore: ObservableObject {
         }
 
         return max(Self.baselineSupportedBundledRevision, defaultProvenance.revision)
+    }
+
+    private func supportedBundledPresentationRevision(for lessonID: Int) -> Int {
+        guard let defaultProvenance = defaults
+            .first(where: { $0.id == lessonID })?
+            .presentation?
+            .provenance,
+              defaultProvenance.source == .bundled
+        else {
+            return Self.baselineSupportedBundledRevision
+        }
+
+        return max(Self.baselineSupportedBundledRevision, defaultProvenance.revision)
+    }
+
+    private func reconcilingBundledContent(in lesson: Lesson) -> Lesson {
+        reconcilingBundledPresentation(
+            in: reconcilingBundledDeepContent(in: lesson)
+        )
     }
 
     private func reconcilingBundledDeepContent(in lesson: Lesson) -> Lesson {
@@ -226,8 +278,34 @@ final class LessonStore: ObservableObject {
         return reconciledLesson
     }
 
+    private func reconcilingBundledPresentation(in lesson: Lesson) -> Lesson {
+        guard let savedPresentation = lesson.presentation else {
+            return lesson
+        }
+
+        guard let defaultLesson = defaults.first(where: { $0.id == lesson.id }),
+              defaultLesson.kind == lesson.kind,
+              defaultLesson.starterCode == lesson.starterCode,
+              let defaultPresentation = defaultLesson.presentation
+        else {
+            var reconciledLesson = lesson
+            reconciledLesson.presentation = nil
+            return reconciledLesson
+        }
+
+        let savedRevision = savedPresentation.provenance.revision
+        let defaultRevision = defaultPresentation.provenance.revision
+        guard savedRevision <= defaultRevision else {
+            return lesson
+        }
+
+        var reconciledLesson = lesson
+        reconciledLesson.presentation = defaultPresentation
+        return reconciledLesson
+    }
+
     private func save() {
-        guard !isReadOnlyForUnsupportedDeepContent else { return }
+        guard !isReadOnlyForUnsupportedLessonContent else { return }
         do {
             try FileManager.default.createDirectory(
                 at: fileURL.deletingLastPathComponent(),

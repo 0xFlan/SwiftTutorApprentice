@@ -242,7 +242,7 @@ struct DeepLessonView: View {
             }
 
             ForEach(Array(content.recallQuestions.enumerated()), id: \.element.id) { index, question in
-                RecallQuestionCard(
+                LessonRecallView(
                     question: question,
                     number: index + 1,
                     onAnswer: onRecallAnswer
@@ -276,121 +276,5 @@ struct DeepLessonView: View {
         guard !reportedViewed else { return }
         reportedViewed = true
         onViewed()
-    }
-}
-
-private struct RecallQuestionCard: View {
-    let question: RecallQuestion
-    let number: Int
-    let onAnswer: (_ questionID: String, _ wasCorrect: Bool) -> Void
-
-    @State private var selectedChoiceIndex: Int?
-    @AccessibilityFocusState private var feedbackIsFocused: Bool
-
-    private var answeredCorrectly: Bool {
-        selectedChoiceIndex == question.correctChoiceIndex
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Question \(number)")
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
-
-                Text(question.prompt)
-                    .font(.headline)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(question.choices.indices, id: \.self) { index in
-                    choiceButton(at: index)
-                }
-            }
-
-            if selectedChoiceIndex != nil {
-                VStack(alignment: .leading, spacing: 6) {
-                    Label {
-                        Text(answeredCorrectly ? "Correct" : "Not quite")
-                            .foregroundStyle(.primary)
-                    } icon: {
-                        Image(
-                            systemName: answeredCorrectly
-                                ? "checkmark.circle.fill"
-                                : "xmark.circle.fill"
-                        )
-                        .foregroundStyle(answeredCorrectly ? Color.green : Color.orange)
-                    }
-                    .font(.headline)
-
-                    Text(question.explanation)
-                        .font(.callout)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
-                }
-                .padding(.top, 2)
-                .accessibilityElement(children: .combine)
-                .accessibilityFocused($feedbackIsFocused)
-            }
-        }
-        .padding(.vertical, 10)
-    }
-
-    private func choiceButton(at index: Int) -> some View {
-        let choice = question.choices[index]
-
-        return Button {
-            selectChoice(at: index)
-        } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("\(index + 1).")
-                    .font(.body.monospacedDigit().bold())
-
-                Text(choice)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Spacer(minLength: 8)
-
-                if selectedChoiceIndex == index {
-                    Image(
-                        systemName: answeredCorrectly
-                            ? "checkmark.circle.fill"
-                            : "xmark.circle.fill"
-                    )
-                    .foregroundStyle(answeredCorrectly ? Color.green : Color.orange)
-                    .accessibilityHidden(true)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.large)
-        .disabled(selectedChoiceIndex != nil)
-        .accessibilityLabel(Text("Answer \(index + 1): \(choice)"))
-        .accessibilityValue(choiceAccessibilityValue(for: index))
-        .help(selectedChoiceIndex == nil ? "Choose this answer" : "This question is locked")
-    }
-
-    private func selectChoice(at index: Int) {
-        guard selectedChoiceIndex == nil else { return }
-        selectedChoiceIndex = index
-        onAnswer(question.id, index == question.correctChoiceIndex)
-        Task { @MainActor in
-            feedbackIsFocused = true
-        }
-    }
-
-    private func choiceAccessibilityValue(for index: Int) -> Text {
-        guard let selectedChoiceIndex else {
-            return Text("Not selected")
-        }
-
-        if selectedChoiceIndex == index {
-            return Text(answeredCorrectly ? "Selected, correct" : "Selected, not quite")
-        }
-
-        return Text("Not selected, question locked")
     }
 }

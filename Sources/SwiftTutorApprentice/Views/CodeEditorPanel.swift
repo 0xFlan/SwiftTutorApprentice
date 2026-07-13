@@ -21,7 +21,7 @@ struct CodeEditorPanel: View {
     /// Reset the editor back to the lesson's starter line.
     let onInsertStarter: () -> Void
 
-    /// False while a walkthrough is auto-typing the code.
+    /// Whether the editor and code-changing practice actions accept input.
     var isEditable: Bool = true
 
     /// Whether practice modes (Arrange / Find the bug) apply — code lessons only.

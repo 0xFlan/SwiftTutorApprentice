@@ -13,30 +13,10 @@ import SwiftUI
 
 struct LessonPanel: View {
     let lesson: Lesson
-    /// 1-based position in the curriculum (for the "Lesson N" label).
-    let number: Int
-    /// Token highlighted by an active walkthrough (nil when idle).
-    var activeTokenID: Int? = nil
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-
-                // --- Header ---
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Lesson \(number)")
-                        .font(.caption.bold())
-                        .foregroundStyle(.secondary)
-                    Text(lesson.title)
-                        .font(.title2.bold())
-                }
-
-                // --- Goal ---
-                section("Goal") {
-                    Text(lesson.goal)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
                 // --- What you will type ---
                 section("What you will type") {
                     Text(lesson.starterCode)
@@ -87,8 +67,7 @@ struct LessonPanel: View {
                         : lesson.syntaxTokens,
                     whyExplanation: lesson.syntaxWhy.isEmpty
                         ? SyntaxTokenizer.autoWhy
-                        : lesson.syntaxWhy,
-                    activeTokenID: activeTokenID
+                        : lesson.syntaxWhy
                 )
 
                 Spacer(minLength: 0)

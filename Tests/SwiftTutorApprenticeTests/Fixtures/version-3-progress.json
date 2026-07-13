@@ -1,0 +1,101 @@
+{
+  "version": 3,
+  "courses": {
+    "swift-development": {
+      "completedLessonLocalIDs": [
+        "1"
+      ],
+      "stageEvents": [
+        {
+          "id": "event-1",
+          "lessonLocalID": "1",
+          "kind": "recallAnswered",
+          "timestamp": {
+            "iso8601": "1970-01-01T00:01:40.000Z",
+            "referenceSeconds": -978307100
+          },
+          "questionID": "recall-1",
+          "wasCorrect": false
+        }
+      ],
+      "presentationStates": {
+        "1": {
+          "status": "started",
+          "lastSceneID": "scene-1",
+          "presentationRevision": 1,
+          "firstStartedAt": {
+            "iso8601": "1970-01-01T00:01:40.000Z",
+            "referenceSeconds": -978307100
+          },
+          "lastOpenedAt": {
+            "iso8601": "1970-01-01T00:03:20.000Z",
+            "referenceSeconds": -978307000
+          },
+          "replayCount": 1
+        }
+      },
+      "assessmentAttempts": [
+        {
+          "id": "attempt-1",
+          "lessonKey": {
+            "courseID": "swift-development",
+            "localID": "1"
+          },
+          "activityID": "swift.lesson-1.ai-review",
+          "itemVariantID": "v1",
+          "conceptIDs": [
+            "swift.lesson-1.string-literal"
+          ],
+          "objectiveMappings": [
+            {
+              "conceptID": "swift.lesson-1.string-literal",
+              "objectiveSetID": "swift-associate-2024",
+              "objectiveID": "3.1"
+            }
+          ],
+          "scaffoldLevel": "none",
+          "result": "passed",
+          "contentRevision": 1,
+          "wasPreviouslySeen": false,
+          "submittedAt": {
+            "iso8601": "1970-01-01T00:01:40.000Z",
+            "referenceSeconds": -978307100
+          }
+        }
+      ],
+      "reviews": [
+        {
+          "id": "review-1",
+          "conceptID": "swift.lesson-1.string-literal",
+          "createdAt": {
+            "iso8601": "1970-01-01T00:03:20.000Z",
+            "referenceSeconds": -978307000
+          },
+          "dueAt": {
+            "iso8601": "1970-01-01T00:05:00.000Z",
+            "referenceSeconds": -978306900
+          },
+          "policyVersion": "policy-1",
+          "sourceEvidenceAttemptIDs": [
+            "attempt-1"
+          ],
+          "satisfyingAttemptID": "attempt-1"
+        }
+      ],
+      "lastLessonLocalID": "1",
+      "readinessSnapshots": [
+        {
+          "objectiveSetID": "swift-associate-2024",
+          "policyVersion": "policy-1",
+          "calculatedAt": {
+            "iso8601": "1970-01-01T00:06:40.000Z",
+            "referenceSeconds": -978306800
+          },
+          "evidenceAttemptIDs": [
+            "attempt-1"
+          ]
+        }
+      ]
+    }
+  }
+}

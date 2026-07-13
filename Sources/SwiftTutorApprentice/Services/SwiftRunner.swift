@@ -28,6 +28,7 @@ struct RunResult {
     /// Set only if the process could not even be launched
     /// (for example, if `swift` could not be found).
     let launchError: String?
+    let workspaceWasSaved: Bool
 
     var didLaunch: Bool { launchError == nil }
     var succeeded: Bool { launchError == nil && exitCode == 0 }
@@ -39,8 +40,11 @@ struct RunResult {
 /// mutable state — every value it needs is passed in or is a static.
 final class SwiftRunner: Sendable {
 
+    private let workspaceURL: URL
+    private let processRunner: CancellableProcessRunner
+
     /// Where we keep the file we run: ~/Developer/SwiftTutorApprentice/Workspace/
-    static var workspaceURL: URL {
+    static var defaultWorkspaceURL: URL {
         FileManager.default
             .homeDirectoryForCurrentUser
             .appendingPathComponent("Developer", isDirectory: true)
@@ -48,31 +52,23 @@ final class SwiftRunner: Sendable {
             .appendingPathComponent("Workspace", isDirectory: true)
     }
 
-    static var mainSwiftURL: URL {
-        workspaceURL.appendingPathComponent("main.swift", isDirectory: false)
+    init(
+        workspaceURL: URL = SwiftRunner.defaultWorkspaceURL,
+        processRunner: CancellableProcessRunner = CancellableProcessRunner()
+    ) {
+        self.workspaceURL = workspaceURL
+        self.processRunner = processRunner
     }
 
     /// Run the given code and return the result.
     /// This is `async` so the UI stays responsive while Swift compiles.
     func run(code: String) async -> RunResult {
-        await withCheckedContinuation { continuation in
-            // Do the blocking file + process work off the main thread.
-            DispatchQueue.global(qos: .userInitiated).async {
-                let result = self.runSynchronously(code: code)
-                continuation.resume(returning: result)
-            }
-        }
-    }
-
-    // MARK: - The actual (blocking) work
-
-    private func runSynchronously(code: String) -> RunResult {
         let fileManager = FileManager.default
 
         // 1. Ensure the workspace folder exists.
         do {
             try fileManager.createDirectory(
-                at: Self.workspaceURL,
+                at: workspaceURL,
                 withIntermediateDirectories: true
             )
         } catch {
@@ -80,77 +76,50 @@ final class SwiftRunner: Sendable {
                 stdout: "",
                 stderr: "",
                 exitCode: -1,
-                launchError: "Could not create the Workspace folder: \(error.localizedDescription)"
+                launchError: "Could not create the Workspace folder: \(error.localizedDescription)",
+                workspaceWasSaved: false
             )
         }
 
         // 2. Write the code to main.swift.
         do {
-            try code.write(to: Self.mainSwiftURL, atomically: true, encoding: .utf8)
+            try code.write(
+                to: workspaceURL.appendingPathComponent("main.swift", isDirectory: false),
+                atomically: true,
+                encoding: .utf8
+            )
         } catch {
             return RunResult(
                 stdout: "",
                 stderr: "",
                 exitCode: -1,
-                launchError: "Could not save main.swift: \(error.localizedDescription)"
+                launchError: "Could not save main.swift: \(error.localizedDescription)",
+                workspaceWasSaved: false
             )
         }
 
-        // 3. Set up the process: /usr/bin/env swift main.swift
-        //    Using /usr/bin/env lets the system find `swift` on the PATH,
-        //    which works whether the app was launched from Terminal or Finder.
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["swift", "main.swift"]
-        process.currentDirectoryURL = Self.workspaceURL
-
-        let outPipe = Pipe()
-        let errPipe = Pipe()
-        process.standardOutput = outPipe
-        process.standardError = errPipe
-
-        // 4. Launch it.
-        do {
-            try process.run()
-        } catch {
+        // 3. Launch a fixed executable and argument list in its own process
+        //    group so cancelling this task terminates compiler descendants too.
+        let result = await processRunner.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: ["swift", "main.swift"],
+            currentDirectoryURL: workspaceURL
+        )
+        if let launchError = result.launchError {
             return RunResult(
                 stdout: "",
                 stderr: "",
                 exitCode: -1,
-                launchError: "Could not start Swift: \(error.localizedDescription)"
+                launchError: "Could not start Swift: \(launchError)",
+                workspaceWasSaved: true
             )
         }
-
-        // Read both pipes on separate threads while the process runs.
-        // Reading concurrently avoids a deadlock that can happen if one
-        // stream fills its buffer while we're blocked reading the other.
-        var outData = Data()
-        var errData = Data()
-        let ioGroup = DispatchGroup()
-        let ioQueue = DispatchQueue(label: "SwiftRunner.io", attributes: .concurrent)
-
-        ioGroup.enter()
-        ioQueue.async {
-            outData = outPipe.fileHandleForReading.readDataToEndOfFile()
-            ioGroup.leave()
-        }
-        ioGroup.enter()
-        ioQueue.async {
-            errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-            ioGroup.leave()
-        }
-
-        process.waitUntilExit()
-        ioGroup.wait()
-
-        let stdout = String(data: outData, encoding: .utf8) ?? ""
-        let stderr = String(data: errData, encoding: .utf8) ?? ""
-
         return RunResult(
-            stdout: stdout,
-            stderr: stderr,
-            exitCode: process.terminationStatus,
-            launchError: nil
+            stdout: result.stdout,
+            stderr: result.stderr,
+            exitCode: result.exitCode,
+            launchError: nil,
+            workspaceWasSaved: true
         )
     }
 }

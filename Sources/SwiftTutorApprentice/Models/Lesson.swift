@@ -75,6 +75,14 @@ struct Lesson: Identifiable, Hashable, Codable {
     /// True only when a saved lesson contains Deep Lesson data this app cannot
     /// decode. This runtime safety state is deliberately excluded from JSON.
     private(set) var hasUnsupportedDeepContent = false
+
+    /// Optional animated, narration-backed teaching content.
+    /// Defaults to `nil` so legacy and custom lessons retain their existing flow.
+    var presentation: LessonPresentation? = nil
+
+    /// True only when a saved lesson contains presentation data this app cannot
+    /// decode. This runtime safety state is deliberately excluded from JSON.
+    private(set) var hasUnsupportedPresentation = false
 }
 
 // Custom decoding lives in an extension so the memberwise initializer is still
@@ -85,7 +93,20 @@ extension Lesson {
     private enum CodingKeys: String, CodingKey {
         case id, title, goal, starterCode, teaches, glossaryTerms,
              syntaxTokens, syntaxWhy, expectedOutput, successMarkers,
-             successMessage, hint, kind, deepContent
+             successMessage, hint, kind, deepContent, presentation
+    }
+
+    private struct PresentationSchemaEnvelope: Decodable {
+        let schemaVersion: Int
+
+        private enum CodingKeys: String, CodingKey {
+            case schemaVersion
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            schemaVersion = try c.decode(Int.self, forKey: .schemaVersion)
+        }
     }
 
     private struct DeepContentSchemaEnvelope: Decodable {
@@ -120,28 +141,52 @@ extension Lesson {
         successMessage = try c.decode(String.self, forKey: .successMessage)
         hint = try c.decode(String.self, forKey: .hint)
         kind = try c.decodeIfPresent(LessonKind.self, forKey: .kind) ?? .code
-        if !c.contains(.deepContent) {
-            deepContent = nil
-            hasUnsupportedDeepContent = false
-        } else if try c.decodeNil(forKey: .deepContent) {
-            deepContent = nil
-            hasUnsupportedDeepContent = false
-        } else {
+        deepContent = nil
+        hasUnsupportedDeepContent = false
+        presentation = nil
+        hasUnsupportedPresentation = false
+
+        if c.contains(.deepContent), try !c.decodeNil(forKey: .deepContent) {
             do {
                 let envelope = try c.decode(
                     DeepContentSchemaEnvelope.self,
                     forKey: .deepContent
                 )
-                guard envelope.schemaVersion == LessonDeepContent.currentSchemaVersion else {
-                    deepContent = nil
+                if envelope.schemaVersion == LessonDeepContent.currentSchemaVersion {
+                    deepContent = try c.decode(LessonDeepContent.self, forKey: .deepContent)
+                } else {
                     hasUnsupportedDeepContent = true
+                }
+            } catch {
+                hasUnsupportedDeepContent = true
+            }
+        }
+        decodePresentation(from: c)
+    }
+
+    private mutating func decodePresentation(
+        from c: KeyedDecodingContainer<CodingKeys>
+    ) {
+        if c.contains(.presentation) {
+            do {
+                if try c.decodeNil(forKey: .presentation) {
                     return
                 }
-                deepContent = try c.decode(LessonDeepContent.self, forKey: .deepContent)
-                hasUnsupportedDeepContent = false
+
+                let envelope = try c.decode(
+                    PresentationSchemaEnvelope.self,
+                    forKey: .presentation
+                )
+                guard envelope.schemaVersion == LessonPresentation.currentSchemaVersion else {
+                    hasUnsupportedPresentation = true
+                    return
+                }
+                presentation = try c.decode(
+                    LessonPresentation.self,
+                    forKey: .presentation
+                )
             } catch {
-                deepContent = nil
-                hasUnsupportedDeepContent = true
+                hasUnsupportedPresentation = true
             }
         }
     }

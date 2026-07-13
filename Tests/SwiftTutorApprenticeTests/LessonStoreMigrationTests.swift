@@ -66,8 +66,72 @@ final class LessonStoreMigrationTests: XCTestCase {
         XCTAssertEqual(persistedLessons[1], expectedEditedLesson)
     }
 
+    func testCompatibleBuiltInLessonReceivesOnlyStockPresentation() throws {
+        var stockLesson = Curriculum.defaultLessons[0]
+        stockLesson.presentation = pilotPresentation(
+            title: "Stock presentation",
+            revision: 2
+        )
+        let secondStockLesson = Curriculum.defaultLessons[1]
+
+        var editedLesson = stockLesson
+        editedLesson.title = "My printing title"
+        editedLesson.goal = "My printing goal"
+        editedLesson.expectedOutput = "My output"
+        editedLesson.teaches = ["my second topic", "my first topic"]
+        editedLesson.deepContent = pilotDeepContent(title: "My deep lesson")
+        editedLesson.presentation = nil
+
+        try writeLessons([secondStockLesson, editedLesson])
+
+        let store = LessonStore(
+            fileURL: fixtureURL,
+            defaults: [stockLesson, secondStockLesson]
+        )
+
+        var expectedEditedLesson = editedLesson
+        expectedEditedLesson.presentation = stockLesson.presentation
+        XCTAssertEqual(store.lessons.map(\.id), [secondStockLesson.id, editedLesson.id])
+        XCTAssertEqual(store.lessons[0], secondStockLesson)
+        XCTAssertEqual(store.lessons[1], expectedEditedLesson)
+        XCTAssertEqual(try readLessons(), [secondStockLesson, expectedEditedLesson])
+    }
+
+    func testDifferentStarterCodeDoesNotReceiveStockPresentation() throws {
+        var stockLesson = Curriculum.defaultLessons[0]
+        stockLesson.deepContent = nil
+        stockLesson.presentation = pilotPresentation(title: "Stock presentation")
+
+        var customizedLesson = stockLesson
+        customizedLesson.starterCode = "print(\"I changed the exercise\")"
+        customizedLesson.presentation = nil
+        try writeLessons([customizedLesson])
+
+        let store = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
+
+        XCTAssertEqual(store.lessons, [customizedLesson])
+        XCTAssertEqual(try readLessons(), [customizedLesson])
+    }
+
+    func testDifferentKindDoesNotReceiveStockPresentation() throws {
+        var stockLesson = Curriculum.defaultLessons[0]
+        stockLesson.deepContent = nil
+        stockLesson.presentation = pilotPresentation(title: "Stock presentation")
+
+        var customizedLesson = stockLesson
+        customizedLesson.kind = .concept
+        customizedLesson.presentation = nil
+        try writeLessons([customizedLesson])
+
+        let store = LessonStore(fileURL: fixtureURL, defaults: [stockLesson])
+
+        XCTAssertEqual(store.lessons, [customizedLesson])
+        XCTAssertEqual(try readLessons(), [customizedLesson])
+    }
+
     func testBuiltInIDWithDifferentStarterCodeDoesNotReceiveStockDeepContent() throws {
         var stockLesson = Curriculum.defaultLessons[0]
+        stockLesson.presentation = nil
         stockLesson.deepContent = pilotDeepContent(
             title: "Stock deep content",
             provenance: bundledProvenance
@@ -87,6 +151,7 @@ final class LessonStoreMigrationTests: XCTestCase {
 
     func testBuiltInIDAndStarterCodeWithDifferentKindDoesNotReceiveStockDeepContent() throws {
         var stockLesson = Curriculum.defaultLessons[0]
+        stockLesson.presentation = nil
         stockLesson.deepContent = pilotDeepContent(
             title: "Stock deep content",
             provenance: bundledProvenance
@@ -159,6 +224,120 @@ final class LessonStoreMigrationTests: XCTestCase {
         XCTAssertEqual(try readLessons()[0].deepContent, currentDefault.deepContent)
     }
 
+    func testBundledPresentationRevisionOlderUpgradesToExactCurrentDefault() throws {
+        var currentDefault = Curriculum.defaultLessons[0]
+        currentDefault.presentation = pilotPresentation(
+            title: "Current bundled presentation",
+            revision: 2
+        )
+        var savedLesson = currentDefault
+        savedLesson.presentation = pilotPresentation(
+            title: "Older bundled presentation",
+            revision: 1
+        )
+        try writeLessons([savedLesson])
+
+        let store = LessonStore(fileURL: fixtureURL, defaults: [currentDefault])
+
+        XCTAssertEqual(store.lessons[0].presentation, currentDefault.presentation)
+        XCTAssertEqual(try readLessons()[0].presentation, currentDefault.presentation)
+    }
+
+    func testBundledPresentationRevisionEqualRepairsContentDrift() throws {
+        var currentDefault = Curriculum.defaultLessons[0]
+        currentDefault.presentation = pilotPresentation(
+            title: "Canonical bundled presentation",
+            revision: 2
+        )
+        var driftedLesson = currentDefault
+        driftedLesson.presentation = pilotPresentation(
+            title: "Drifted presentation at same revision",
+            revision: 2
+        )
+        try writeLessons([driftedLesson])
+
+        let store = LessonStore(fileURL: fixtureURL, defaults: [currentDefault])
+
+        XCTAssertEqual(store.lessons[0].presentation, currentDefault.presentation)
+        XCTAssertEqual(try readLessons()[0].presentation, currentDefault.presentation)
+    }
+
+    func testBundledPresentationRevisionCurrentDefaultRemovalRemovesSavedContent() throws {
+        var currentDefault = Curriculum.defaultLessons[0]
+        currentDefault.presentation = nil
+        var savedLesson = currentDefault
+        savedLesson.presentation = pilotPresentation(
+            title: "No longer shipped",
+            revision: 1
+        )
+        try writeLessons([savedLesson])
+
+        let store = LessonStore(fileURL: fixtureURL, defaults: [currentDefault])
+
+        XCTAssertNil(store.lessons[0].presentation)
+        XCTAssertNil(try readLessons()[0].presentation)
+    }
+
+    func testBundledPresentationRevisionNewerMakesStoreReadOnlyBeforeReconciliation() throws {
+        var currentDefault = Curriculum.defaultLessons[0]
+        currentDefault.presentation = pilotPresentation(
+            title: "Current app presentation",
+            revision: 2
+        )
+        var newerSavedLesson = currentDefault
+        newerSavedLesson.presentation = pilotPresentation(
+            title: "Newer saved presentation",
+            revision: 3
+        )
+        let secondSavedLesson = Curriculum.defaultLessons[1]
+        let missingDefault = Curriculum.defaultLessons[2]
+        let originalData = try JSONEncoder().encode([newerSavedLesson, secondSavedLesson])
+
+        try assertReadOnlyStorePreservesEveryByte(
+            originalData,
+            defaults: [currentDefault, secondSavedLesson, missingDefault]
+        )
+    }
+
+    func testNewerBundledPresentationWithIncompatibleStarterIsReadOnlyBeforeRemoval() throws {
+        let currentDefault = Curriculum.defaultLessons[0]
+        var futureRevisionLesson = currentDefault
+        futureRevisionLesson.starterCode = "print(\"Future custom starter\")"
+        futureRevisionLesson.presentation = pilotPresentation(
+            title: "Future bundled presentation",
+            revision: 2
+        )
+        let secondSavedLesson = Curriculum.defaultLessons[1]
+        let missingDefault = Curriculum.defaultLessons[2]
+        let originalData = try JSONEncoder().encode(
+            [futureRevisionLesson, secondSavedLesson]
+        )
+
+        try assertReadOnlyStorePreservesEveryByte(
+            originalData,
+            defaults: [currentDefault, secondSavedLesson, missingDefault]
+        )
+    }
+
+    func testNewerBundledPresentationWithoutMatchingDefaultIsReadOnlyBeforeRemoval() throws {
+        var futureRevisionLesson = Curriculum.defaultLessons[0]
+        futureRevisionLesson.id = 9_302
+        futureRevisionLesson.presentation = pilotPresentation(
+            title: "Future orphaned bundled presentation",
+            revision: 2
+        )
+        let secondSavedLesson = Curriculum.defaultLessons[1]
+        let missingDefault = Curriculum.defaultLessons[2]
+        let originalData = try JSONEncoder().encode(
+            [futureRevisionLesson, secondSavedLesson]
+        )
+
+        try assertReadOnlyStorePreservesEveryByte(
+            originalData,
+            defaults: [secondSavedLesson, missingDefault]
+        )
+    }
+
     func testCurrentDefaultWithoutBundledContentRemovesSavedBundledContent() throws {
         var currentDefault = Curriculum.defaultLessons[0]
         currentDefault.deepContent = nil
@@ -212,7 +391,8 @@ final class LessonStoreMigrationTests: XCTestCase {
     }
 
     func testAddPreservesProvenanceNilCustomContent() throws {
-        let currentDefault = Curriculum.defaultLessons[0]
+        var currentDefault = Curriculum.defaultLessons[0]
+        currentDefault.presentation = nil
         let store = LessonStore(fileURL: fixtureURL, defaults: [currentDefault])
         var addedLesson = currentDefault
         addedLesson.id = 9_202
@@ -398,6 +578,60 @@ final class LessonStoreMigrationTests: XCTestCase {
         )
     }
 
+    func testFuturePresentationSchemaPreservesEveryByte() throws {
+        let bundledFixtureURL = try XCTUnwrap(
+            Bundle.module.url(
+                forResource: "future-presentation-lessons",
+                withExtension: "json",
+                subdirectory: "Fixtures"
+            )
+        )
+        let originalData = try Data(contentsOf: bundledFixtureURL)
+        try originalData.write(to: fixtureURL, options: .atomic)
+
+        let firstDefault = Curriculum.defaultLessons[0]
+        let missingDefault = Curriculum.defaultLessons[1]
+        let store = LessonStore(
+            fileURL: fixtureURL,
+            defaults: [firstDefault, missingDefault]
+        )
+        let safelyDecodedLessons = store.lessons
+
+        func assertUnchanged() throws {
+            XCTAssertEqual(store.lessons, safelyDecodedLessons)
+            XCTAssertEqual(try Data(contentsOf: fixtureURL), originalData)
+        }
+
+        XCTAssertEqual(store.lessons.count, 1)
+        XCTAssertEqual(store.lessons[0].title, "Future presentation lesson")
+        XCTAssertEqual(store.lessons[0].starterCode, "print(\"Future-safe\")")
+        XCTAssertNil(store.lessons[0].presentation)
+        XCTAssertTrue(store.lessons[0].hasUnsupportedPresentation)
+        XCTAssertTrue(store.isReadOnlyForUnsupportedLessonContent)
+        XCTAssertTrue(store.isReadOnlyForUnsupportedDeepContent)
+        XCTAssertNil(store.lesson(id: missingDefault.id))
+        try assertUnchanged()
+
+        var addedLesson = firstDefault
+        addedLesson.id = 99_902
+        store.add(addedLesson)
+        try assertUnchanged()
+
+        var updatedLesson = store.lessons[0]
+        updatedLesson.title = "This update must stay blocked"
+        XCTAssertNil(store.update(updatedLesson))
+        try assertUnchanged()
+
+        store.delete(id: store.lessons[0].id)
+        try assertUnchanged()
+
+        store.move(id: store.lessons[0].id, by: 1)
+        try assertUnchanged()
+
+        store.restoreDefaults()
+        try assertUnchanged()
+    }
+
     func testNewerBundledRevisionWithIncompatibleStarterIsReadOnlyBeforeReconciliation() throws {
         let currentDefault = Curriculum.defaultLessons[0]
         var futureRevisionLesson = currentDefault
@@ -444,6 +678,7 @@ final class LessonStoreMigrationTests: XCTestCase {
         customLesson.id = 9_001
         customLesson.title = "My custom lesson"
         customLesson.deepContent = nil
+        customLesson.presentation = nil
         try writeLessons([customLesson, firstStockLesson])
 
         let defaults = [firstStockLesson, missingStockLesson]
@@ -579,6 +814,7 @@ final class LessonStoreMigrationTests: XCTestCase {
         }
 
         XCTAssertTrue(store.isReadOnlyForUnsupportedDeepContent)
+        XCTAssertTrue(store.isReadOnlyForUnsupportedLessonContent)
         try assertUnchanged()
 
         var addedLesson = try XCTUnwrap(defaults.last)
@@ -631,6 +867,53 @@ final class LessonStoreMigrationTests: XCTestCase {
             ),
             recallQuestions: [],
             provenance: provenance
+        )
+    }
+
+    private func pilotPresentation(
+        title: String,
+        revision: Int = 1
+    ) -> LessonPresentation {
+        let state = PresentationVisualState(
+            code: "print(\"Hello\")",
+            codeTokens: [PresentationCodeToken(id: "print", text: "print")],
+            values: [PresentationValue(id: "message", name: "message", value: "Hello")],
+            output: nil,
+            outputTargetID: "console",
+            description: "The print call is ready."
+        )
+        return LessonPresentation(
+            id: "pilot-presentation",
+            title: title,
+            posterDescription: "A presentation migration fixture.",
+            posterState: state,
+            scenes: [
+                PresentationScene(
+                    id: "scene-1",
+                    title: "Run print",
+                    caption: "The value moves to output.",
+                    narration: "Run the print call.",
+                    staticDescription: "The print call points to the console.",
+                    visualKind: .codeExecution,
+                    focusTargets: [PresentationFocusTarget(kind: .codeToken, id: "print")],
+                    before: state,
+                    after: PresentationVisualState(
+                        code: state.code,
+                        codeTokens: state.codeTokens,
+                        values: state.values,
+                        output: "Hello",
+                        outputTargetID: "console",
+                        description: "Hello appears in the console."
+                    )
+                )
+            ],
+            transcript: "Run print and observe Hello in the console.",
+            narrationLocale: "en-US",
+            finalRecallQuestionID: "recall-1",
+            aiCodeExercise: nil,
+            conceptIDs: ["swift.print"],
+            objectiveMappings: [],
+            provenance: LessonPresentationProvenance(source: .bundled, revision: revision)
         )
     }
 }

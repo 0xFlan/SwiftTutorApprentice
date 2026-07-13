@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "completedLessonIDs": [
+    2
+  ],
+  "stageEvents": [
+    {
+      "lessonID": 1,
+      "kind": "deepLessonViewed",
+      "timestamp": 0,
+      "questionID": null,
+      "wasCorrect": null
+    }
+  ]
+}

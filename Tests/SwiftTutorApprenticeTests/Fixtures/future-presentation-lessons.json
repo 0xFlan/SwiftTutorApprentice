@@ -1,0 +1,55 @@
+[
+  {
+    "id": 901,
+    "title": "Future presentation lesson",
+    "goal": "Keep the lesson usable when its presentation is newer than the app",
+    "starterCode": "print(\"Future-safe\")",
+    "teaches": [
+      "forward compatibility"
+    ],
+    "glossaryTerms": [
+      "String"
+    ],
+    "syntaxTokens": [],
+    "syntaxWhy": "The base lesson remains readable independently of optional presentation content.",
+    "expectedOutput": "Future-safe",
+    "successMarkers": [
+      "print("
+    ],
+    "successMessage": "The base lesson still works.",
+    "hint": "Run the starter code.",
+    "kind": "code",
+    "presentation": {
+      "schemaVersion": 2,
+      "id": "swift.future-presentation",
+      "title": "A future presentation",
+      "posterDescription": "Content authored for a newer app.",
+      "posterState": {
+        "code": "print(\"Future-safe\")",
+        "codeTokens": [],
+        "values": [],
+        "output": null,
+        "outputTargetID": "console",
+        "description": "The future presentation is ready."
+      },
+      "scenes": [],
+      "transcript": "This presentation uses a future schema.",
+      "narrationLocale": "en-US",
+      "finalRecallQuestionID": "future-recall",
+      "aiCodeExercise": null,
+      "conceptIDs": [],
+      "objectiveMappings": [],
+      "provenance": {
+        "source": "bundled",
+        "revision": 1
+      },
+      "futureAnimationTimeline": {
+        "keyframes": [
+          0,
+          0.5,
+          1
+        ]
+      }
+    }
+  }
+]

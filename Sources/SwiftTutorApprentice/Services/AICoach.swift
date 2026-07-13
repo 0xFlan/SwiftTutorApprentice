@@ -30,14 +30,16 @@ struct AIResult {
 /// mutable state — safe to use from a background thread.
 final class AICoach: Sendable {
 
+    private let processRunner: CancellableProcessRunner
+
+    init(processRunner: CancellableProcessRunner = CancellableProcessRunner()) {
+        self.processRunner = processRunner
+    }
+
     /// Ask the AI coach about the learner's current code, in the context
     /// of the current lesson. `command` is the CLI to run (e.g. "claude").
     func explain(code: String, lesson: Lesson, command: String) async -> AIResult {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                continuation.resume(returning: self.run(code: code, lesson: lesson, command: command))
-            }
-        }
+        await run(code: code, lesson: lesson, command: command)
     }
 
     /// Ask the AI coach via the Anthropic Messages API (an alternative to the
@@ -81,7 +83,7 @@ final class AICoach: Sendable {
 
     // MARK: - Private
 
-    private func run(code: String, lesson: Lesson, command: String) -> AIResult {
+    private func run(code: String, lesson: Lesson, command: String) async -> AIResult {
         guard let executable = resolveExecutable(command) else {
             return AIResult(
                 text: "",
@@ -95,39 +97,20 @@ final class AICoach: Sendable {
 
         let prompt = buildPrompt(code: code, lesson: lesson)
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = ["-p", prompt]
-        // Run from a neutral directory so the CLI doesn't pick up unrelated
-        // project context from wherever the app happens to be launched.
-        process.currentDirectoryURL = FileManager.default.temporaryDirectory
-
-        let outPipe = Pipe()
-        let errPipe = Pipe()
-        process.standardOutput = outPipe
-        process.standardError = errPipe
-
-        do {
-            try process.run()
-        } catch {
-            return AIResult(text: "", errorMessage: "Couldn't start '\(command)': \(error.localizedDescription)")
+        let result = await processRunner.run(
+            executableURL: URL(fileURLWithPath: executable),
+            arguments: ["-p", prompt],
+            currentDirectoryURL: FileManager.default.temporaryDirectory
+        )
+        if let launchError = result.launchError {
+            return AIResult(text: "", errorMessage: "Couldn't start '\(command)': \(launchError)")
         }
 
-        // Read both streams concurrently to avoid pipe deadlock.
-        var outData = Data()
-        var errData = Data()
-        let group = DispatchGroup()
-        let queue = DispatchQueue(label: "AICoach.io", attributes: .concurrent)
-        group.enter(); queue.async { outData = outPipe.fileHandleForReading.readDataToEndOfFile(); group.leave() }
-        group.enter(); queue.async { errData = errPipe.fileHandleForReading.readDataToEndOfFile(); group.leave() }
-        process.waitUntilExit()
-        group.wait()
+        let stdout = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        let stderr = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let stdout = (String(data: outData, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let stderr = (String(data: errData, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if process.terminationStatus != 0 || stdout.isEmpty {
-            let detail = stderr.isEmpty ? "The tool returned no output (exit code \(process.terminationStatus))." : stderr
+        if result.exitCode != 0 || stdout.isEmpty {
+            let detail = stderr.isEmpty ? "The tool returned no output (exit code \(result.exitCode))." : stderr
             return AIResult(
                 text: "",
                 errorMessage: "The AI tool didn't return a usable answer.\n\n\(detail)"
