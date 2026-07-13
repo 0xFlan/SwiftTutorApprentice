@@ -554,10 +554,15 @@ final class CourseWorkspaceLayoutTests: XCTestCase {
 
         model.selectLesson(.swift(firstID), origin: .direct)
         refresh(rendered.host)
-        let firstRow = try XCTUnwrap(waitForMarker(
+        let firstRowCandidate = waitForMarker(
             named: "lesson-row-\(LessonKey.swift(firstID).id)",
             in: rendered.host
-        ))
+        )
+        XCTAssertNotNil(
+            firstRowCandidate,
+            "Far-off selected row did not mount. selected=\(String(describing: model.selectedLessonKey)); origin=\(sidebar.contentView.bounds.origin.y); documentHeight=\(sidebar.documentView?.bounds.height ?? 0); viewportHeight=\(sidebar.contentView.bounds.height); mountedRows=\(mountedLessonRowIdentifiers(in: rendered.host))"
+        )
+        guard let firstRow = firstRowCandidate else { return }
         XCTAssertTrue(
             isMeaningfullyVisible(firstRow, in: sidebar),
             "A direct keyboard-style selection of far-off Lesson 1 must minimally reveal it. \(visibilityDiagnostics(firstRow, in: sidebar))"
@@ -738,6 +743,18 @@ final class CourseWorkspaceLayoutTests: XCTestCase {
             matches.append(contentsOf: markers(named: identifier, in: child))
         }
         return matches
+    }
+
+    private func mountedLessonRowIdentifiers(in view: NSView) -> [String] {
+        var identifiers: [String] = []
+        if let identifier = view.identifier?.rawValue,
+           identifier.hasPrefix("lesson-row-") {
+            identifiers.append(identifier)
+        }
+        for child in view.subviews {
+            identifiers.append(contentsOf: mountedLessonRowIdentifiers(in: child))
+        }
+        return identifiers.sorted()
     }
 
     private func codeEditorTextView(in view: NSView) throws -> NSTextView {
