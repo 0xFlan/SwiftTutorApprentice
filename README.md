@@ -84,6 +84,8 @@ still requires a successful Run whose output matches the lesson's expected
 output. The written concept lesson remains available through **Read deeper**
 and never auto-opens.
 
+![The Deep Lesson sheet: each concept explained with a correct example, a wrong variant, and why the wrong one fails](docs/images/deep-lesson.png)
+
 Each pilot lesson also includes a local **Understand AI Code** exercise: inspect
 generated-looking Swift, judge specific claims, submit the answers, and review
 authored feedback. This exercise runs without a network request and does not
