@@ -7,6 +7,10 @@ Swift needs the syntax, and what happens when it runs.
 Everything happens **inside the app**: reading, typing, running, tracking
 progress, and even authoring your own lessons. No terminal needed to use it.
 
+![A Swift lesson in SwiftTutor Apprentice: the lesson list, the animated lesson player, and the Watch, Recall, Modify, Practice/Run steps](docs/images/lesson-workspace.png)
+
+![Course Home, with Swift Development available and three more courses coming next](docs/images/course-home.png)
+
 ## Requirements
 
 - macOS 14 or newer
@@ -14,11 +18,10 @@ progress, and even authoring your own lessons. No terminal needed to use it.
 
 ## Open it as a normal app (recommended)
 
-Build a double-clickable `.app` bundle (this one-time step uses the terminal;
-using the app afterwards does not):
+Build a double-clickable `.app` bundle from your clone (this one-time step uses
+the terminal; using the app afterwards does not):
 
 ```bash
-cd ~/Developer/SwiftTutorApprentice
 ./Scripts/build-app.sh
 ```
 
@@ -150,15 +153,28 @@ as development credentials, not long-lived production secrets.
 
 ## Project layout
 
+All app code lives in `Sources/SwiftTutorApprentice/`:
+
 - `Models/` — `Lesson`, `Curriculum` (default lessons), `GlossaryEntry`,
   `SyntaxToken`. Data-driven: a lesson is just data.
 - `Services/` — `SwiftRunner` (runs code), `LiveCoach` (rule-based feedback),
-  `AICoach` (optional CLI-based AI), `LessonStore` (JSON lessons),
-  `ProgressStore`, `AppSettings`.
+  `AICoach` (optional AI), `CourseCatalog` and `CourseContentRegistry` (the
+  course roadmap), the presentation player and narration, the Modify and
+  Understand AI Code evaluators, `LessonStore` (JSON lessons), `ProgressStore`
+  with `ProgressMigration`, and `AppSettings`.
 - `AppModel.swift` — shared state (view model).
-- `Views/` — sidebar, three panels, run/output bar, lesson editor, settings,
-  welcome.
-- `Scripts/` — `build-app.sh` (package the `.app`), `make-icon.sh` +
+- `Views/` — Course Home, the course workspace and lesson list, the lesson
+  player and stage stepper, editor and Live Coach panels, run/output bar,
+  Recall, Modify, Parsons, Find the bug, Understand AI Code, lesson editor,
+  settings, and welcome.
+
+Also at the top level:
+
+- `Tests/` — unit and layout tests (`swift test`), plus shell tests for the
+  scripts.
+- `Scripts/` — `build-app.sh` (package the `.app`), `verify-app-bundle.sh`
+  (check a bundle against the checkout), `course-platform-smoke-state.sh`
+  (back up and restore app data for smoke testing), `make-icon.sh` +
   `make-icon.swift` (regenerate the icon).
 
 ## Note on sandboxed shells
